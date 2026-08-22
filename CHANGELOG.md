@@ -11,7 +11,7 @@ output for a fixed set of inputs. A change that alters emitted bytes for a fixed
 seed is a major version event even when no signature changed, because it breaks
 the reproducibility of every published manifest.
 
-## Unreleased
+## 0.1.0 - 2026-08-22
 
 ### Changed, and it moved emitted bytes
 

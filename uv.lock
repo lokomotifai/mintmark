@@ -423,7 +423,7 @@ wheels = [
 
 [[package]]
 name = "mintmark"
-version = "0.1.0.dev4"
+version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "jsonschema" },
