@@ -33,18 +33,6 @@ jobs:
   canary:
     name: private-corpus canary
     runs-on: ubuntu-latest
-    # GitHub does not expose repository secrets to a pull request opened by
-    # Dependabot, so the canary would arrive empty and this job would fail on
-    # every dependency bump. Skipping it there is safe and narrow: a Dependabot
-    # branch touches only the lockfile and workflow pins, it cannot introduce
-    # private corpus material into the tree, and the same tree is scanned on the
-    # push to main that follows the merge.
-    #
-    # The condition names the actor rather than testing whether the secret is
-    # empty. An empty secret in any other context must still fail: a canary check
-    # that disables itself the moment its input goes missing is worse than no
-    # check at all.
-    if: github.actor != 'dependabot[bot]'
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
@@ -55,10 +43,29 @@ jobs:
       # secret and the committed digest proves the right string was used.
       # A missing secret fails this job by design: a canary check that
       # silently skips is worse than no check at all.
+      # GitHub does not expose repository secrets to a pull request opened by
+      # Dependabot, so the canary would arrive empty and this job would fail on
+      # every dependency bump. The scan is skipped there and nowhere else.
+      #
+      # The job itself always runs and always reports, because it is a required
+      # status check: a skipped job leaves that check unreported, and a required
+      # check that never reports blocks the pull request forever.
+      #
+      # The condition names the actor rather than testing whether the secret is
+      # empty. An empty secret in any other context must still fail. A control
+      # that disables itself the moment its input goes missing is not a control.
       - name: Scan tree for private-corpus canary
+        if: github.actor != 'dependabot[bot]'
         env:
           MINTMARK_CANARY: ${{ secrets.MINTMARK_CANARY }}
         run: uv run python tools/canary.py .
+      - name: Record why the scan was skipped
+        if: github.actor == 'dependabot[bot]'
+        run: |
+          echo "Skipped: repository secrets are not available to Dependabot," >> "$GITHUB_STEP_SUMMARY"
+          echo "so the canary cannot be supplied here. This branch changes only" >> "$GITHUB_STEP_SUMMARY"
+          echo "the lockfile and workflow pins, and the tree is scanned on the" >> "$GITHUB_STEP_SUMMARY"
+          echo "push to main that follows the merge." >> "$GITHUB_STEP_SUMMARY"
 
   tests:
     name: tests on ${{ matrix.os }}
