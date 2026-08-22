@@ -35,7 +35,8 @@ layers =
 ;
 ;     engine-is-stdlib-only   WP-01  ACTIVE
 ;     identifiers-narrow      WP-03  ACTIVE
-;     leaf-modules-narrow     WP-04 (annotate), WP-06 (packs)
+;     annotate-narrow         WP-04  ACTIVE
+;     leaf-modules-narrow     WP-06 (packs)
 ;     emit-narrow             WP-09
 ;     manifest-narrow         WP-10
 ;
@@ -89,6 +90,18 @@ forbidden_modules =
     mintmark.cli
     mintmark.manifest
     mintmark.emit
+allow_indirect_imports = False
+
+[importlinter:contract:annotate-narrow]
+name = annotate imports only engine
+type = forbidden
+source_modules =
+    mintmark.annotate
+forbidden_modules =
+    mintmark.cli
+    mintmark.manifest
+    mintmark.emit
+    mintmark.identifiers
 allow_indirect_imports = False
 
 ; [importlinter:contract:leaf-modules-narrow]
