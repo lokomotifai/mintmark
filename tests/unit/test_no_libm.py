@@ -109,6 +109,31 @@ def test_no_float_literal_in_the_mint_path(path: Path) -> None:
     assert not offenders, f"{path.name} contains float literals: {offenders}"
 
 
+@pytest.mark.parametrize("path", SOURCES, ids=lambda p: p.name)
+def test_no_float_construction_in_the_mint_path(path: Path) -> None:
+    """A literal is not the only way a float enters an expression.
+
+    float("0.02") carries no float literal and produces a float all the same.
+    This test was added after exactly that slipped into a tolerance comparison.
+    """
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    offenders = [
+        f"float() at line {node.lineno}"
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "float"
+    ]
+    assert not offenders, f"{path.name} constructs floats: {offenders}"
+
+
+# A syntactic ban on `/` was tried here and removed. pathlib overloads the
+# operator for path joining, which every module in this package uses, and the AST
+# cannot tell `Path / "name"` from `count / total`. A check that fires on correct
+# code teaches people to ignore it. The guards that do work are the two scans
+# above plus mypy --strict, which rejects a float reaching an int-typed field.
+
+
 def test_the_offline_generator_is_allowed_to_use_math() -> None:
     """The rule is about where the arithmetic runs, not about avoiding it.
 

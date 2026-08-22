@@ -144,6 +144,30 @@ wolf is switched off within a week. Generic cores therefore keep the whole name
 too, and a test sweeps ten ordinary Turkish sentences to prove none of them trips
 the scan.
 
+## Turkey's permanent UTC+3 status
+
+**Owning milestone:** WP-07. **Verified:** 2026-08-22. **Drift risk:** low, but
+real: it is a policy decision, and Turkey changed it once already.
+
+**Why this needed verifying.** Timestamps are rendered with a fixed `+03:00`
+offset. If Turkey still observed daylight saving, that rendering would be wrong
+for roughly half of every year, and wrong in a way no test written inside this
+project could notice.
+
+**Source.** The IANA time zone database, zone `Europe/Istanbul`, as shipped with
+CPython through `tzdata`. Retrieved 2026-08-22.
+
+**Method.** The UTC offset and daylight-saving offset were evaluated in January,
+April, July, and October of 2017, 2020, 2023, 2026, 2027, and 2030.
+
+**Outcome.** One distinct offset across the whole range: `+03:00`, with a
+daylight-saving offset of zero at every sampled instant. Turkey moved to
+permanent UTC+3 in 2016. The fixed rendering is correct.
+
+**If this changes.** A reintroduction of daylight saving makes the fixed offset
+wrong. The correct response is a proper zone-aware rendering and a major version
+bump, not a widened tolerance.
+
 ## Still to verify
 
 These belong to milestones that have not run yet and are listed so that nobody
@@ -151,7 +175,6 @@ mistakes their absence for a completed check.
 
 | Fact | Owning milestone | Wired into cadence |
 | --- | --- | --- |
-| Turkey's permanent UTC+3 status, which the +03:00 rendering assumes | WP-07 | Yes |
 | Taxonomy pin against the hushmark-tr closed v0.1 label set | WP-04 | Yes |
 
 ## How to add an entry

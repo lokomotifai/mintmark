@@ -36,6 +36,7 @@ dev = [
   "import-linter>=2.1,<3",
   "cyclonedx-bom>=5.1,<6",
   "types-pyyaml>=6.0.12.20260815",
+  "types-jsonschema>=4.26.0.20260518",
 ]
 
 # Package data ships with both the sdist and the wheel. tools/ and tests/ do not.
