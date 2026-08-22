@@ -207,6 +207,7 @@ def mint(
     context = _MintContext(
         pack=loaded, recipe=declared, factory=factory, policy=policy, counts=counts
     )
+    context.compile_templates()
 
     generated: dict[str, list[Record]] = {}
     sidecars: dict[str, list[SidecarRecord]] = {}
@@ -244,6 +245,11 @@ class _MintContext:
     coverage: dict[str, int] = dataclass_field(default_factory=dict)
     _tables: dict[str, Table] = dataclass_field(default_factory=dict)
     _templates: dict[str, tuple[tuple[Node, ...], ...]] = dataclass_field(default_factory=dict)
+
+    def compile_templates(self) -> None:
+        """Compile every declared template before any records are generated."""
+        for set_name in sorted(self.pack.template_sets):
+            self.templates(set_name)
 
     def table(self, name: str) -> Table:
         if name not in self._tables:

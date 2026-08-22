@@ -99,6 +99,9 @@ class Optional:
 Node = Literal | FieldSlot | EntitySlot | IdentifierSlot | Alternation | Optional
 
 _SLOT_KINDS = frozenset({"field", "entity", "id"})
+MAX_TEMPLATE_CHARS = 65_536
+MAX_TEMPLATE_DEPTH = 64
+MAX_PROBABILITY_DECIMAL_PLACES = 19
 
 
 def parse_template(
@@ -109,6 +112,13 @@ def parse_template(
     known_identifiers: frozenset[str],
 ) -> tuple[Node, ...]:
     """Compile a template into nodes, failing closed on anything malformed."""
+    if len(text) > MAX_TEMPLATE_CHARS:
+        raise TemplateError(
+            template_id,
+            MAX_TEMPLATE_CHARS,
+            "template-length-limit",
+            f"template exceeds the supported length of {MAX_TEMPLATE_CHARS}",
+        )
     nodes, position = _parse_sequence(
         text,
         0,
@@ -116,6 +126,7 @@ def parse_template(
         known_labels=known_labels,
         known_identifiers=known_identifiers,
         terminators="",
+        depth=0,
     )
     if position != len(text):
         raise TemplateError(template_id, position, "unexpected-close", f"stray {text[position]!r}")
@@ -130,7 +141,15 @@ def _parse_sequence(
     known_labels: frozenset[str],
     known_identifiers: frozenset[str],
     terminators: str,
+    depth: int,
 ) -> tuple[tuple[Node, ...], int]:
+    if depth > MAX_TEMPLATE_DEPTH:
+        raise TemplateError(
+            template_id,
+            start,
+            "template-nesting-limit",
+            f"template nesting exceeds the supported depth of {MAX_TEMPLATE_DEPTH}",
+        )
     nodes: list[Node] = []
     buffer: list[str] = []
     position = start
@@ -166,7 +185,7 @@ def _parse_sequence(
         if character == "(":
             flush()
             node, position = _parse_alternation(
-                text, position, template_id, known_labels, known_identifiers
+                text, position, template_id, known_labels, known_identifiers, depth
             )
             nodes.append(node)
             continue
@@ -174,7 +193,7 @@ def _parse_sequence(
         if character == "[":
             flush()
             node, position = _parse_optional(
-                text, position, template_id, known_labels, known_identifiers
+                text, position, template_id, known_labels, known_identifiers, depth
             )
             nodes.append(node)
             continue
@@ -254,6 +273,7 @@ def _parse_alternation(
     template_id: str,
     known_labels: frozenset[str],
     known_identifiers: frozenset[str],
+    depth: int,
 ) -> tuple[Node, int]:
     branches: list[tuple[Node, ...]] = []
     position = start + 1
@@ -265,6 +285,7 @@ def _parse_alternation(
             known_labels=known_labels,
             known_identifiers=known_identifiers,
             terminators="|)",
+            depth=depth + 1,
         )
         branches.append(nodes)
         if position >= len(text):
@@ -292,6 +313,7 @@ def _parse_optional(
     template_id: str,
     known_labels: frozenset[str],
     known_identifiers: frozenset[str],
+    depth: int,
 ) -> tuple[Node, int]:
     if not text.startswith("[?", start):
         raise TemplateError(
@@ -313,6 +335,7 @@ def _parse_optional(
         known_labels=known_labels,
         known_identifiers=known_identifiers,
         terminators="]",
+        depth=depth + 1,
     )
     if position >= len(text) or text[position] != "]":
         raise TemplateError(
@@ -333,6 +356,16 @@ def _validate_rate(template_id: str, position: int, rate: str) -> None:
     if not value.is_finite() or not Decimal(0) <= value <= Decimal(1):
         raise TemplateError(
             template_id, position, "probability-out-of-range", f"{rate!r} is not in [0, 1]"
+        )
+    exponent = value.as_tuple().exponent
+    places = max(0, -exponent) if isinstance(exponent, int) else MAX_PROBABILITY_DECIMAL_PLACES + 1
+    if places > MAX_PROBABILITY_DECIMAL_PLACES:
+        raise TemplateError(
+            template_id,
+            position,
+            "probability-precision-limit",
+            f"{rate!r} has {places} decimal places; at most "
+            f"{MAX_PROBABILITY_DECIMAL_PLACES} are supported",
         )
 
 

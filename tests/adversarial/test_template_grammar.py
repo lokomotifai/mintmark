@@ -9,9 +9,16 @@ anything is written.
 
 from __future__ import annotations
 
+import shutil
+from pathlib import Path
+
 import pytest
+import yaml
 
 from mintmark.engine.templates import (
+    MAX_PROBABILITY_DECIMAL_PLACES,
+    MAX_TEMPLATE_CHARS,
+    MAX_TEMPLATE_DEPTH,
     Alternation,
     EntitySlot,
     FieldSlot,
@@ -21,9 +28,11 @@ from mintmark.engine.templates import (
     TemplateError,
     parse_template,
 )
+from mintmark.mint import mint
 
 LABELS = frozenset({"PERSON", "ORG", "HEALTH", "UNION", "IBAN", "TCKN"})
 IDENTIFIERS = frozenset({"TCKN", "VKN", "IBAN", "PAN", "PHONE", "EMAIL"})
+CONFORMANCE = Path(__file__).resolve().parents[1] / "conformance" / "pack"
 
 
 def parse(text: str, template_id: str = "fixture") -> tuple[object, ...]:
@@ -121,3 +130,43 @@ def test_turkish_text_passes_through_unchanged() -> None:
 def test_an_empty_template_parses_to_nothing() -> None:
     """Rejecting this belongs to the schema's minLength, not to the parser."""
     assert parse("") == ()
+
+
+def test_template_length_budget_fails_closed() -> None:
+    with pytest.raises(TemplateError) as caught:
+        parse("x" * (MAX_TEMPLATE_CHARS + 1))
+    assert caught.value.rule == "template-length-limit"
+
+
+def test_template_nesting_budget_fails_closed_without_recursion_error() -> None:
+    text = "[?1:" * (MAX_TEMPLATE_DEPTH + 1) + "x" + "]" * (MAX_TEMPLATE_DEPTH + 1)
+    with pytest.raises(TemplateError) as caught:
+        parse(text)
+    assert caught.value.rule == "template-nesting-limit"
+
+
+def test_optional_probability_precision_is_bounded() -> None:
+    rate = "0." + "1" * (MAX_PROBABILITY_DECIMAL_PLACES + 1)
+    with pytest.raises(TemplateError) as caught:
+        parse(f"[?{rate}:x]")
+    assert caught.value.rule == "probability-precision-limit"
+
+
+def test_all_templates_compile_before_minting_records(tmp_path: Path) -> None:
+    pack = tmp_path / "pack"
+    shutil.copytree(CONFORMANCE, pack)
+    template = next((pack / "templates").rglob("*.yaml"))
+    document = yaml.safe_load(template.read_text(encoding="utf-8"))
+    document["entries"][0]["text"] = (
+        "[?1:" * (MAX_TEMPLATE_DEPTH + 1) + "x" + "]" * (MAX_TEMPLATE_DEPTH + 1)
+    )
+    template.write_text(
+        yaml.safe_dump(document, allow_unicode=True, sort_keys=False), encoding="utf-8"
+    )
+    out = tmp_path / "out"
+
+    with pytest.raises(TemplateError) as caught:
+        mint(pack=pack, recipe="full", seed=1, out=out, invocation="pytest")
+
+    assert caught.value.rule == "template-nesting-limit"
+    assert not out.exists()
