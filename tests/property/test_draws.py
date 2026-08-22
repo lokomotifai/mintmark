@@ -73,6 +73,24 @@ def test_bound_of_one_consumes_no_draw() -> None:
     assert stream.state == before
 
 
+def test_full_u64_domain_is_supported() -> None:
+    stream = SplitMix64(99)
+    expected = stream.next_u64()
+
+    assert bounded(SplitMix64(99), TWO64) == expected
+
+
+@pytest.mark.parametrize("bad", [TWO64 + 1, TWO64 * 2, 10**100])
+def test_bound_larger_than_u64_domain_is_refused_without_drawing(bad: int) -> None:
+    stream = SplitMix64(1)
+    before = stream.state
+
+    with pytest.raises(ValueError, match="exceeds the 64-bit sampler domain"):
+        bounded(stream, bad)
+
+    assert stream.state == before
+
+
 @pytest.mark.parametrize("bad", [0, -1, -(10**9)])
 def test_non_positive_bound_is_refused(bad: int) -> None:
     with pytest.raises(ValueError, match="must be positive"):

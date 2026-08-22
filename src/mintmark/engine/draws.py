@@ -42,6 +42,8 @@ def bounded_with_stats(stream: SplitMix64, n: int) -> Draw:
     """Draw uniformly from ``[0, n)`` by rejection sampling."""
     if n <= 0:
         raise ValueError(f"bound must be positive, got {n}")
+    if n > TWO64:
+        raise ValueError(f"bound exceeds the 64-bit sampler domain: {n}")
     if n == 1:
         return Draw(0, 0)
 
