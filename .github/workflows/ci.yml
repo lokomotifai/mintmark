@@ -19,10 +19,11 @@ jobs:
     name: format, lint, types, imports, prose
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
           enable-cache: true
+          version: "0.12.3"
       - run: uv sync --locked
       - run: uv run ruff format --check .
       - run: uv run ruff check .
@@ -34,38 +35,33 @@ jobs:
     name: private-corpus canary
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
           enable-cache: true
+          version: "0.12.3"
       - run: uv sync --locked
       # The canary is never committed. It is supplied here as a repository
       # secret and the committed digest proves the right string was used.
       # A missing secret fails this job by design: a canary check that
       # silently skips is worse than no check at all.
-      # GitHub does not expose repository secrets to a pull request opened by
-      # Dependabot, so the canary would arrive empty and this job would fail on
-      # every dependency bump. The scan is skipped there and nowhere else.
-      #
-      # The job itself always runs and always reports, because it is a required
-      # status check: a skipped job leaves that check unreported, and a required
-      # check that never reports blocks the pull request forever.
-      #
-      # The condition names the actor rather than testing whether the secret is
-      # empty. An empty secret in any other context must still fail. A control
-      # that disables itself the moment its input goes missing is not a control.
+      # Pull-request code never receives the repository canary. The real scan
+      # runs only after reviewed code reaches main; PRs exercise the scanner with
+      # a public fixture so this required job still reports a meaningful result.
       - name: Scan tree for private-corpus canary
-        if: github.actor != 'dependabot[bot]'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           MINTMARK_CANARY: ${{ secrets.MINTMARK_CANARY }}
         run: uv run python tools/canary.py .
-      - name: Record why the scan was skipped
-        if: github.actor == 'dependabot[bot]'
+      - name: Exercise the canary scanner without repository secrets
+        if: github.event_name == 'pull_request'
+        run: uv run pytest tests/unit/test_canary.py
+      - name: Record the pull-request trust boundary
+        if: github.event_name == 'pull_request'
         run: |
-          echo "Skipped: repository secrets are not available to Dependabot," >> "$GITHUB_STEP_SUMMARY"
-          echo "so the canary cannot be supplied here. This branch changes only" >> "$GITHUB_STEP_SUMMARY"
-          echo "the lockfile and workflow pins, and the tree is scanned on the" >> "$GITHUB_STEP_SUMMARY"
-          echo "push to main that follows the merge." >> "$GITHUB_STEP_SUMMARY"
+          echo "Repository canary withheld from pull-request code." >> "$GITHUB_STEP_SUMMARY"
+          echo "The scanner's public-fixture tests passed; the private canary" >> "$GITHUB_STEP_SUMMARY"
+          echo "scan runs on the reviewed push to main." >> "$GITHUB_STEP_SUMMARY"
 
   tests:
     name: tests on ${{ matrix.os }}
@@ -77,9 +73,10 @@ jobs:
         # matrix widens the claim, so it changes only by an explicit decision.
         os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest]
     steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
           enable-cache: true
+          version: "0.12.3"
       - run: uv sync --locked
       - run: uv run pytest -ra

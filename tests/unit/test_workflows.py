@@ -10,6 +10,8 @@ caught here instead.
 
 from __future__ import annotations
 
+import re
+import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -119,3 +121,62 @@ def test_the_release_workflow_refuses_a_tag_that_disagrees_with_the_package() ->
     assert "GITHUB_REF_NAME" in body
     assert "mintmark.__version__" in body
     assert "exit 1" in body, "the version check no longer fails the run"
+
+
+@pytest.mark.parametrize("path", WORKFLOWS, ids=lambda p: p.name)
+def test_every_external_action_is_pinned_to_an_immutable_commit(path: Path) -> None:
+    document = load(path)
+    for job_name, job in document["jobs"].items():
+        for step in job["steps"]:
+            uses = step.get("uses")
+            if uses is None or uses.startswith("./"):
+                continue
+            assert re.fullmatch(r"[^@]+@[0-9a-f]{40}", uses), (
+                f"{path.name}:{job_name} uses mutable action reference {uses!r}"
+            )
+
+
+def test_uv_and_the_build_backend_are_exactly_locked() -> None:
+    with (REPO_ROOT / "pyproject.toml").open("rb") as handle:
+        project = tomllib.load(handle)
+    assert project["build-system"]["requires"] == ["hatchling==1.31.0"]
+    assert "hatchling==1.31.0" in project["dependency-groups"]["dev"]
+    assert project["tool"]["uv"]["required-version"] == "==0.12.3"
+    lock = (REPO_ROOT / "uv.lock").read_text(encoding="utf-8")
+    assert 'name = "hatchling"\nversion = "1.31.0"' in lock
+
+
+def test_pull_request_code_never_receives_the_private_canary() -> None:
+    document = load(WORKFLOW_DIR / "ci.yml")
+    steps = document["jobs"]["canary"]["steps"]
+    secret_steps = [
+        step for step in steps if "MINTMARK_CANARY" in step.get("env", {})
+    ]
+    assert len(secret_steps) == 1
+    condition = secret_steps[0].get("if", "")
+    assert "github.event_name == 'push'" in condition
+    assert "refs/heads/main" in condition
+    assert any(
+        step.get("if") == "github.event_name == 'pull_request'"
+        and "tests/unit/test_canary.py" in step.get("run", "")
+        for step in steps
+    )
+
+
+def test_release_scans_and_seals_the_exact_built_artifacts_before_oidc() -> None:
+    document = load(WORKFLOW_DIR / "release.yml")
+    build_steps = document["jobs"]["build"]["steps"]
+    publish_steps = document["jobs"]["publish"]["steps"]
+    build_text = "\n".join(step.get("run", "") for step in build_steps)
+    publish_text = "\n".join(step.get("run", "") for step in publish_steps)
+
+    assert "uv build --no-build-isolation" in build_text
+    assert "uv export --locked --no-dev --no-emit-project" in build_text
+    assert "tools/canary.py dist/" in build_text
+    assert "sha256sum mintmark-*.whl mintmark-*.tar.gz" in build_text
+    assert "sha256sum -c SHA256SUMS" in publish_text
+    publisher = publish_steps[-1]
+    assert publisher["uses"].startswith("pypa/gh-action-pypi-publish@")
+    assert publisher["with"]["verify-metadata"] is True
+    canary = next(step for step in build_steps if "MINTMARK_CANARY" in step.get("env", {}))
+    assert "refs/tags/v" in canary.get("if", "")

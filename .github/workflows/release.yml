@@ -33,10 +33,11 @@ jobs:
     outputs:
       version: ${{ steps.check.outputs.version }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
           enable-cache: true
+          version: "0.12.3"
       - run: uv sync --locked
       - id: check
         name: Compare the tag against pyproject and the package
@@ -63,12 +64,14 @@ jobs:
     needs: verify
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
           enable-cache: true
+          version: "0.12.3"
       - run: uv sync --locked
-      - run: uv build
+      - name: Build with the backend installed from uv.lock
+        run: uv build --no-build-isolation
       - name: Generate the bill of materials
         run: uv run cyclonedx-py environment --of JSON -o dist/sbom.json
       - name: Confirm the built artifacts carry the tagged version
@@ -76,10 +79,38 @@ jobs:
           set -euo pipefail
           test -f "dist/mintmark-${{ needs.verify.outputs.version }}-py3-none-any.whl"
           test -f "dist/mintmark-${{ needs.verify.outputs.version }}.tar.gz"
-      - uses: actions/upload-artifact@v4
+      - name: Inspect the exact distributions that will be published
+        run: uv run pytest tests/unit/test_packaging.py
+      - name: Smoke-test the wheel in an isolated directory
+        run: |
+          set -euo pipefail
+          wheel="$PWD/dist/mintmark-${{ needs.verify.outputs.version }}-py3-none-any.whl"
+          smoke=$(mktemp -d)
+          uv venv --python 3.12 "$smoke/venv"
+          uv export --locked --no-dev --no-emit-project -o "$smoke/requirements.txt"
+          uv pip install --python "$smoke/venv/bin/python" -r "$smoke/requirements.txt"
+          uv pip install --python "$smoke/venv/bin/python" --no-deps "$wheel"
+          cd "$smoke"
+          "$smoke/venv/bin/mintmark" mint --pack example --recipe demo --seed 42 --out run
+          "$smoke/venv/bin/mintmark" verify run
+      - name: Scan built artifacts for private-corpus canary
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        env:
+          MINTMARK_CANARY: ${{ secrets.MINTMARK_CANARY }}
+        run: uv run python tools/canary.py dist/
+      - name: Seal publishable bytes
+        run: |
+          cd dist
+          sha256sum mintmark-*.whl mintmark-*.tar.gz > SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: distributions
-          path: dist/
+          if-no-files-found: error
+          path: |
+            dist/mintmark-*.whl
+            dist/mintmark-*.tar.gz
+            dist/sbom.json
+            dist/SHA256SUMS
 
   publish:
     name: publish to PyPI
@@ -92,13 +123,19 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: distributions
           path: dist/
+      - name: Verify the bytes approved by the build job
+        run: |
+          cd dist
+          sha256sum -c SHA256SUMS
       - name: Remove everything that is not a distribution
         # The bill of materials is a release asset, not something PyPI accepts.
         run: rm -f dist/sbom.json
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
         with:
           attestations: true
+          packages-dir: dist/
+          verify-metadata: true
