@@ -223,3 +223,23 @@ def test_each_readme_names_the_release_that_matches_this_version(path: Path) -> 
     assert named == {version}, (
         f"{path.name} names releases {sorted(named)} while the package is {version}"
     )
+
+
+@pytest.mark.parametrize("path", [ENGLISH, TURKISH], ids=["en", "tr"])
+def test_each_readme_claims_the_number_of_tests_that_exist(path: Path, request) -> None:
+    """A count in a badge is a claim, and claims here have to hold.
+
+    Asserted against what this run collected rather than a literal, so adding a
+    test fails the build until the badge follows. Skipped when a subset is
+    selected, because then the number is not the suite's.
+    """
+    import re
+
+    collected = request.session.testscollected
+    if collected < 100:
+        pytest.skip("a subset was selected; the collected count is not the suite's")
+    text = path.read_text(encoding="utf-8")
+    claimed = {int(m) for m in re.findall(r"badge/tests?-(\d+)-", text)}
+    assert claimed == {collected}, (
+        f"{path.name} claims {sorted(claimed) or 'no'} tests; the suite collects {collected}"
+    )
