@@ -1,8 +1,15 @@
 # Cadence checks. THIS WORKFLOW REQUIRES NETWORK ACCESS at run time and is
 # deliberately separated from the required checks in ci.yml for that reason.
 #
-# Findings land as issues. A run that finds nothing records that it ran and
-# found nothing; silence is not evidence.
+# A drift check that can be decided mechanically fails the run, and a failed
+# scheduled run notifies the repository owner. The last two steps cannot be
+# decided mechanically: they print what needs re-confirming against a primary
+# source and rely on somebody reading them.
+#
+# This file used to say findings land as issues. Nothing here has ever opened
+# one, and the `issues: write` permission it held was unused. The claim is
+# removed rather than implemented, because the honest description of a printed
+# reminder is a printed reminder.
 name: weekly (network)
 
 on:
@@ -12,7 +19,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
 
 jobs:
   drift:
