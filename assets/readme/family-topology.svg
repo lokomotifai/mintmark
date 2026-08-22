@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 480" width="1200" height="480" role="img"
+     aria-label="Diagram of the Mintmark family topology. A single hub repository named mintmark holds the engine: generation, identifiers, annotation, manifests, and the command line interface. Three sector pack repositories hang from it, mintmark-banking, mintmark-insurance, and mintmark-hr, each carrying declarations and data with no engine code. A fourth, health, is drawn dashed and marked deferred because its special-category density needs its own governance review. Each pack pins the engine by a version range with a closed upper bound.">
+  <title>The Mintmark family topology</title>
+  <desc>One engine repository with three sector pack repositories hanging from it, and a fourth deferred.</desc>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#FBFAF8" fill-opacity="0.35"/>
+    </marker>
+  </defs>
+    <rect width="1200" height="480" fill="#111111"/>
+  <text x="40" y="50" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="22" font-weight="600" fill="#FBFAF8" fill-opacity="0.95">One hub, thin spokes</text>
+  <text x="40" y="76" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14.5" fill="#FBFAF8" fill-opacity="0.55">Engine logic never duplicates into a pack, so a fix reaches every sector at once.</text>
+  <rect x="350" y="110" width="500" height="110" rx="14" fill="#17191F" stroke="#D11F26" stroke-opacity="0.55" stroke-width="1.5"/>
+  <text x="368" y="140" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="600" fill="#D11F26" fill-opacity="1">mintmark</text>
+  <text x="368" y="160" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.5" fill="#FBFAF8" fill-opacity="0.45">the engine, this repository</text>
+  <text x="368" y="184" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" fill="#FBFAF8" fill-opacity="0.6">generation, identifiers, annotation, manifests, CLI</text>
+  <rect x="60" y="300" width="210" height="130" rx="14" fill="#17191F" stroke="#FBFAF8" stroke-opacity="0.22" stroke-width="1.5"/>
+  <text x="78" y="330" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="600" fill="#FBFAF8" fill-opacity="1">mintmark-banking</text>
+  <text x="78" y="350" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.5" fill="#FBFAF8" fill-opacity="0.45">first spoke</text>
+  <text x="78" y="374" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" fill="#FBFAF8" fill-opacity="0.6">customers, accounts, cards</text>
+  <text x="78" y="394" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" fill="#FBFAF8" fill-opacity="0.6">complaints, KYC notes</text>
+  <path d="M 600 220 L 600 262 L 165 262 L 165 300" fill="none" stroke="#FBFAF8" stroke-opacity="0.3" stroke-width="1.8" marker-end="url(#a)"/>
+  <rect x="350" y="300" width="210" height="130" rx="14" fill="#17191F" stroke="#FBFAF8" stroke-opacity="0.22" stroke-width="1.5"/>
+  <text x="368" y="330" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="600" fill="#FBFAF8" fill-opacity="1">mintmark-insurance</text>
+  <text x="368" y="350" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.5" fill="#FBFAF8" fill-opacity="0.45">second spoke</text>
+  <text x="368" y="374" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" fill="#FBFAF8" fill-opacity="0.6">policies, claims, payments</text>
+  <text x="368" y="394" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" fill="#FBFAF8" fill-opacity="0.6">claim notes, calls</text>
+  <path d="M 600 220 L 600 262 L 455 262 L 455 300" fill="none" stroke="#FBFAF8" stroke-opacity="0.3" stroke-width="1.8" marker-end="url(#a)"/>
+  <rect x="640" y="300" width="210" height="130" rx="14" fill="#17191F" stroke="#FBFAF8" stroke-opacity="0.22" stroke-width="1.5"/>
+  <text x="658" y="330" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="600" fill="#FBFAF8" fill-opacity="1">mintmark-hr</text>
+  <text x="658" y="350" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.5" fill="#FBFAF8" fill-opacity="0.45">third spoke</text>
+  <text x="658" y="374" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" fill="#FBFAF8" fill-opacity="0.6">employees, payroll, leave</text>
+  <text x="658" y="394" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" fill="#FBFAF8" fill-opacity="0.6">performance, recruiting</text>
+  <path d="M 600 220 L 600 262 L 745 262 L 745 300" fill="none" stroke="#FBFAF8" stroke-opacity="0.3" stroke-width="1.8" marker-end="url(#a)"/>
+  <rect x="930" y="300" width="210" height="130" rx="14" fill="#17191F" stroke="#FBFAF8" stroke-opacity="0.12" stroke-width="1.5" stroke-dasharray="6 5"/>
+  <text x="948" y="330" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="600" fill="#FBFAF8" fill-opacity="0.45">health</text>
+  <text x="948" y="350" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.5" fill="#FBFAF8" fill-opacity="0.3">deferred, FD-03</text>
+  <text x="948" y="374" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" fill="#FBFAF8" fill-opacity="0.28">special-category density</text>
+  <text x="948" y="394" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" fill="#FBFAF8" fill-opacity="0.28">needs its own review</text>
+  <path d="M 600 220 L 600 262 L 1035 262 L 1035 300" fill="none" stroke="#3B3F46" stroke-opacity="0.25" stroke-width="1.8" stroke-dasharray="5 5" marker-end="url(#a)"/>
+  <text x="620" y="248" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.5" fill="#FBFAF8" fill-opacity="0.5">each pack pins the engine by a version range with a closed upper bound</text>
+  <text x="40" y="462" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" fill="#FBFAF8" fill-opacity="0.42">A pack carries declarations and data and no engine code at all. Its only Python lives in tests and imports nothing beyond the public API.</text>
+</svg>

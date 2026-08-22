@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 132 132" width="132" height="132"
+     preserveAspectRatio="xMidYMid meet" role="img"
+     aria-label="Mintmark mark: a reeded coin on a dark tile, its face carrying three data rows with the middle row struck in red.">
+  <title>Mintmark</title>
+  <desc>A reeded coin on a dark tile. The coin face carries three rows of data, the middle one struck in red, standing for a labeled span in minted data.</desc>
+  <rect x="0" y="0" width="132" height="132" rx="30" fill="#111111"/>
+  <rect x="6.5" y="6.5" width="119" height="119" rx="24" fill="none" stroke="#FBFAF8" stroke-opacity="0.14" stroke-width="1"/>
+
+  <!-- Reeded rim: the milled edge of a struck coin. -->
+  <line x1="107.00" y1="66.00" x2="113.00" y2="66.00" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="106.38" y1="73.12" x2="112.29" y2="74.16" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="104.53" y1="80.02" x2="110.17" y2="82.07" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="101.51" y1="86.50" x2="106.70" y2="89.50" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="97.41" y1="92.35" x2="102.00" y2="96.21" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="92.35" y1="97.41" x2="96.21" y2="102.00" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="86.50" y1="101.51" x2="89.50" y2="106.70" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="80.02" y1="104.53" x2="82.07" y2="110.17" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="73.12" y1="106.38" x2="74.16" y2="112.29" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="66.00" y1="107.00" x2="66.00" y2="113.00" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="58.88" y1="106.38" x2="57.84" y2="112.29" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="51.98" y1="104.53" x2="49.93" y2="110.17" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="45.50" y1="101.51" x2="42.50" y2="106.70" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="39.65" y1="97.41" x2="35.79" y2="102.00" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="34.59" y1="92.35" x2="30.00" y2="96.21" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="30.49" y1="86.50" x2="25.30" y2="89.50" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="27.47" y1="80.02" x2="21.83" y2="82.07" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="25.62" y1="73.12" x2="19.71" y2="74.16" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="25.00" y1="66.00" x2="19.00" y2="66.00" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="25.62" y1="58.88" x2="19.71" y2="57.84" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="27.47" y1="51.98" x2="21.83" y2="49.93" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="30.49" y1="45.50" x2="25.30" y2="42.50" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="34.59" y1="39.65" x2="30.00" y2="35.79" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="39.65" y1="34.59" x2="35.79" y2="30.00" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="45.50" y1="30.49" x2="42.50" y2="25.30" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="51.98" y1="27.47" x2="49.93" y2="21.83" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="58.88" y1="25.62" x2="57.84" y2="19.71" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="66.00" y1="25.00" x2="66.00" y2="19.00" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="73.12" y1="25.62" x2="74.16" y2="19.71" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="80.02" y1="27.47" x2="82.07" y2="21.83" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="86.50" y1="30.49" x2="89.50" y2="25.30" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="92.35" y1="34.59" x2="96.21" y2="30.00" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="97.41" y1="39.65" x2="102.00" y2="35.79" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="101.51" y1="45.50" x2="106.70" y2="42.50" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="104.53" y1="51.98" x2="110.17" y2="49.93" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="106.38" y1="58.88" x2="112.29" y2="57.84" stroke="#FBFAF8" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round"/>
+
+  <!-- Coin body. -->
+  <circle cx="66.0" cy="66.0" r="41" fill="#17191F" stroke="#FBFAF8" stroke-opacity="0.45" stroke-width="2.5"/>
+
+  <!-- The face: three data rows, the struck one in red. -->
+  <rect x="42" y="52" width="42" height="8" rx="4" fill="#FBFAF8" fill-opacity="0.45"/>
+  <rect x="38" y="66" width="3" height="12" rx="1.5" fill="#D11F26"/>
+  <rect x="43" y="68" width="46" height="8" rx="4" fill="#D11F26"/>
+  <rect x="91" y="66" width="3" height="12" rx="1.5" fill="#D11F26"/>
+  <rect x="42" y="84" width="30" height="8" rx="4" fill="#FBFAF8" fill-opacity="0.45"/>
+</svg>

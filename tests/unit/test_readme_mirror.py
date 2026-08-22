@@ -17,6 +17,21 @@ ENGLISH = REPO_ROOT / "README.md"
 TURKISH = REPO_ROOT / "README.tr.md"
 
 HEADING = re.compile(r"^(#{1,6})\s", re.MULTILINE)
+
+
+def callout(path: Path) -> str:
+    """The Important callout, unwrapped into one line and lowercased.
+
+    A blockquote wraps at the line, so a phrase like "legal advice" can be split
+    by a newline and a continuation marker. Searching the raw text for it would
+    fail on wording that is present and correct.
+    """
+    text = path.read_text(encoding="utf-8")
+    block = text[text.index("> [!IMPORTANT]") :].split("\n\n")[0]
+    unwrapped = " ".join(line.lstrip("> ").strip() for line in block.splitlines())
+    return " ".join(unwrapped.split()).lower()
+
+
 FENCE = re.compile(r"^(?: {4}.*\n?)+", re.MULTILINE)
 
 
@@ -38,10 +53,10 @@ def test_the_heading_structures_match() -> None:
 
 
 def test_the_mirror_is_not_a_summary() -> None:
-    """Turkish runs longer than English for the same content, never shorter."""
+    """Turkish runs about as long as English for the same content, never shorter."""
     english = len(ENGLISH.read_text(encoding="utf-8"))
     turkish = len(TURKISH.read_text(encoding="utf-8"))
-    assert turkish > english * 0.85, (
+    assert turkish > english * 0.9, (
         f"the Turkish mirror is {turkish} characters against {english}; that is a "
         "summary rather than a mirror"
     )
@@ -49,33 +64,45 @@ def test_the_mirror_is_not_a_summary() -> None:
 
 @pytest.mark.parametrize("path", [ENGLISH, TURKISH], ids=["en", "tr"])
 def test_each_readme_carries_the_required_blocks(path: Path) -> None:
-    """Section 3.2 of the repository standard, in order."""
+    """Section 3.2 of the repository standard, in the family's header style.
+
+    The title is an HTML heading rather than a markdown one, because the family's
+    READMEs centre their header block. The requirement is that each block is
+    present and in order, not that it is written in any particular syntax.
+    """
     text = path.read_text(encoding="utf-8")
-    assert text.startswith("# Mintmark")
-    assert "**" in text.split("\n")[2], "no one-line bold claim under the title"
-    assert "> **" in text, "no Important callout"
-    assert "mintmark mint --pack packs/example" in text, "no offline quickstart"
-    assert "Apache-2.0" in text
+    assert '<h1 align="center">Mintmark</h1>' in text, "no title block"
+
+    claim = text.index('<p align="center"><strong>')
+    important = text.index("> [!IMPORTANT]")
+    quickstart = text.index("mintmark mint --pack packs/example")
+    # rindex, not index: the licence badge sits in the header block, so the first
+    # occurrence of the licence name is not the licence section.
+    licence = text.rindex("Apache-2.0")
+
+    assert claim < important < quickstart < licence, "the required blocks are out of order"
     assert "TRADEMARKS.md" in text
 
 
 @pytest.mark.parametrize("path", [ENGLISH, TURKISH], ids=["en", "tr"])
 def test_each_readme_states_what_the_tool_is_not(path: Path) -> None:
-    text = path.read_text(encoding="utf-8").lower()
-    for claim in ("anonymization", "anonimleştirilmesi"):
-        if claim in text:
-            break
-    else:
-        raise AssertionError("neither README says it is not anonymization of real data")
-    assert "kvkk" in text or "compliance" in text or "uyumluluk" in text
+    """The Important callout has to actually carry the disclaimers."""
+    block = callout(path)
+
+    assert "anonymization" in block or "anonimleştir" in block, (
+        "the callout does not say this is not anonymization of real data"
+    )
+    assert "legal advice" in block or "hukuki tavsiye" in block
+    assert "compliance guarantee" in block or "uyumluluk garantisi" in block
+    assert "limits" in block or "sınırlar" in block
 
 
 @pytest.mark.parametrize("path", [ENGLISH, TURKISH], ids=["en", "tr"])
 def test_each_readme_discloses_the_phone_coincidence_limit(path: Path) -> None:
-    """The one limitation that cannot be engineered away has to be stated."""
-    text = path.read_text(encoding="utf-8").lower()
-    assert "phone" in text or "telefon" in text
-    assert "coincide" in text or "çakış" in text
+    """The one limitation that cannot be engineered away, stated in the callout."""
+    block = callout(path)
+    assert "phone" in block or "telefon" in block
+    assert "coincide" in block or "çakış" in block
 
 
 @pytest.mark.parametrize("path", [ENGLISH, TURKISH], ids=["en", "tr"])
@@ -92,6 +119,39 @@ def test_neither_readme_claims_a_published_package(path: Path) -> None:
     text = path.read_text(encoding="utf-8").lower()
     assert "pypi.org/project" not in text
     assert "available on pypi" not in text
+
+
+@pytest.mark.parametrize("path", [ENGLISH, TURKISH], ids=["en", "tr"])
+def test_each_readme_carries_the_family_navigation(path: Path) -> None:
+    """The sibling link is how a reader finds the other language."""
+    text = path.read_text(encoding="utf-8")
+    other = "README.tr.md" if path is ENGLISH else "README.md"
+    assert other in text, f"{path.name} does not link to {other}"
+    assert "lokomotifai/pactmark" in text, "no family footer"
+
+
+@pytest.mark.parametrize("path", [ENGLISH, TURKISH], ids=["en", "tr"])
+def test_the_diagrams_referenced_by_each_readme_exist(path: Path) -> None:
+    """A README promising a picture that is not committed shows a broken image."""
+    text = path.read_text(encoding="utf-8")
+    for asset in (
+        "assets/readme/mint-pipeline.png",
+        "assets/readme/mint-pipeline.svg",
+        "assets/readme/family-topology.png",
+        "assets/readme/family-topology.svg",
+        "assets/brand/mintmark-logo.svg",
+    ):
+        assert asset in text, f"{path.name} does not reference {asset}"
+        assert (REPO_ROOT / asset).exists(), f"{asset} is referenced but not committed"
+
+
+@pytest.mark.parametrize("path", [ENGLISH, TURKISH], ids=["en", "tr"])
+def test_every_diagram_carries_alt_text_a_screen_reader_can_use(path: Path) -> None:
+    """A diagram with no alt text is a diagram some readers simply do not get."""
+    for match in re.finditer(r"!\[([^\]]*)\]\(assets/", path.read_text(encoding="utf-8")):
+        assert len(match.group(1)) > 60, (
+            f"{path.name} has a diagram whose alt text is too short to replace it"
+        )
 
 
 def test_the_quickstart_output_block_matches_what_verify_prints(tmp_path: Path) -> None:
