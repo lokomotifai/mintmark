@@ -37,7 +37,7 @@ layers =
 ;     identifiers-narrow      WP-03  ACTIVE
 ;     annotate-narrow         WP-04  ACTIVE
 ;     packs-narrow            WP-06  ACTIVE
-;     emit-narrow             WP-09
+;     emit-narrow             WP-09  ACTIVE
 ;     manifest-narrow         WP-10
 ;
 ; Uncomment a contract in its owning milestone, never earlier and never later.
@@ -58,17 +58,17 @@ forbidden_modules =
     mintmark.lexicons
 allow_indirect_imports = False
 
-; [importlinter:contract:emit-narrow]
-; name = emit imports only annotate and engine
-; type = forbidden
-; source_modules =
-;     mintmark.emit
-; forbidden_modules =
-;     mintmark.cli
-;     mintmark.manifest
-;     mintmark.identifiers
-;     mintmark.packs
-; allow_indirect_imports = False
+[importlinter:contract:emit-narrow]
+name = emit imports only annotate and engine
+type = forbidden
+source_modules =
+    mintmark.emit
+forbidden_modules =
+    mintmark.cli
+    mintmark.manifest
+    mintmark.identifiers
+    mintmark.packs
+allow_indirect_imports = False
 
 ; [importlinter:contract:manifest-narrow]
 ; name = manifest imports only emit and engine
