@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lokomotifai.dev/mintmark/schemas/pack.schema.json",
+  "title": "Mintmark pack declaration, contract version 1",
+  "description": "A pack declares what to mint. The engine decides how. additionalProperties is false at every level: an unknown field is a typo or a feature the core does not have, and both must fail closed rather than be ignored.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "name", "version", "requires_core", "locale",
+               "allowed_identifier_policies", "description", "description_tr"],
+  "properties": {
+    "schema_version": {"type": "integer", "const": 1},
+    "name": {"type": "string", "pattern": "^mintmark-[a-z0-9-]+$"},
+    "version": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"},
+    "requires_core": {
+      "type": "string",
+      "description": "A SemVer range with a closed upper bound. An open-ended range would let a future core silently change what a published manifest reproduces.",
+      "pattern": "^>=\\d+\\.\\d+(\\.\\d+)?,<\\d+\\.\\d+(\\.\\d+)?$"
+    },
+    "locale": {"type": "string", "const": "tr-TR"},
+    "allowed_identifier_policies": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"enum": ["safe", "validator"]}
+    },
+    "description": {"type": "string", "minLength": 10, "maxLength": 300},
+    "description_tr": {"type": "string", "minLength": 10, "maxLength": 300}
+  },
+  "$defs": {
+    "decimalString": {
+      "type": "string",
+      "description": "A decimal literal as a string. Weights and rates are never JSON numbers: 0.1 is not representable in binary floating point, and a mint that rounded differently on another platform would break the determinism claim.",
+      "pattern": "^\\d+(\\.\\d+)?$"
+    },
+    "label": {
+      "enum": ["PERSON", "ADDRESS", "ORG", "DOB", "HEALTH", "RELIGION", "ETHNICITY",
+               "POLITICAL", "SEXUAL_LIFE", "CRIMINAL", "BIOMETRIC_REF", "UNION",
+               "TCKN", "VKN", "IBAN", "PAN", "PHONE", "EMAIL", "none"]
+    },
+    "recordType": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "type_name", "id_prefix", "order", "fields"],
+      "properties": {
+        "schema_version": {"type": "integer", "const": 1},
+        "type_name": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+        "id_prefix": {"type": "string", "pattern": "^[A-Z][A-Z0-9]{1,7}$"},
+        "order": {"type": "integer", "minimum": 1},
+        "fields": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/field"}}
+      }
+    },
+    "field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type", "generator", "pii_label"],
+      "properties": {
+        "name": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+        "type": {"enum": ["str", "int", "decimal_str", "date", "datetime", "enum", "ref", "doc"]},
+        "generator": {
+          "type": "string",
+          "pattern": "^(lexicon:[a-z][a-z0-9_]*|identifier:(TCKN|VKN|IBAN|PAN|PHONE|EMAIL)|grammar:[a-z][a-z0-9_]*|int_uniform|int_lognormal_table:[a-z][a-z0-9_]*|enum_weighted|seq_id|datetime_window|derived:(email_from_name|date_offset|ratio_of|copy_of))$"
+        },
+        "params": {"type": "object"},
+        "ref": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["parent", "counts", "weights"],
+          "properties": {
+            "parent": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+            "counts": {"type": "array", "minItems": 1, "items": {"type": "integer", "minimum": 0}},
+            "weights": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/decimalString"}}
+          }
+        },
+        "nullable": {"type": "boolean"},
+        "null_rate": {"$ref": "#/$defs/decimalString"},
+        "pii_label": {"$ref": "#/$defs/label"}
+      }
+    },
+    "recipe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "name", "records", "date_window", "special_rate"],
+      "properties": {
+        "schema_version": {"type": "integer", "const": 1},
+        "name": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+        "records": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {"type": "integer", "minimum": 0}
+        },
+        "date_window": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["start", "end"],
+          "properties": {
+            "start": {"type": "string", "format": "date-time"},
+            "end": {"type": "string", "format": "date-time"}
+          }
+        },
+        "doc_mix": {"type": "object", "additionalProperties": {"$ref": "#/$defs/decimalString"}},
+        "special_rate": {"$ref": "#/$defs/decimalString"},
+        "coverage_targets": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+        "identifier_policy": {"enum": ["safe", "validator"]},
+        "emit_child_outside_window": {
+          "type": "boolean",
+          "description": "When false, a child record whose derived date falls outside the recipe's window is not emitted. Declared explicitly because it changes record counts by large factors."
+        }
+      }
+    },
+    "templateSet": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "weight", "text"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z][a-z0-9_-]*$"},
+          "weight": {"$ref": "#/$defs/decimalString"},
+          "text": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  }
+}

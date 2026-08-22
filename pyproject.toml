@@ -35,6 +35,7 @@ dev = [
   "mypy>=1.13,<2",
   "import-linter>=2.1,<3",
   "cyclonedx-bom>=5.1,<6",
+  "types-pyyaml>=6.0.12.20260815",
 ]
 
 # Package data ships with both the sdist and the wheel. tools/ and tests/ do not.
@@ -42,18 +43,20 @@ dev = [
 packages = ["src/mintmark"]
 
 # Data directories are added here by the milestone that creates them:
-# assets/tables -> WP-02 (done), assets/denylist -> WP-05 (done), schemas -> WP-06,
+# assets/tables -> WP-02 (done), assets/denylist -> WP-05 (done), schemas -> WP-06 (done),
 # packs/example -> WP-12. WP-16's packaging manifest test asserts the final set.
 # No empty placeholder directories are created to satisfy this config early.
 
 [tool.hatch.build.targets.wheel.force-include]
 "assets/tables" = "mintmark/_data/assets/tables"
 "assets/denylist" = "mintmark/_data/assets/denylist"
+"schemas" = "mintmark/_data/schemas"
 
 [tool.hatch.build.targets.sdist]
 include = [
   "src/mintmark",
   "assets",
+  "schemas",
   "tests",
   "tools",
   "LICENSE",

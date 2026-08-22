@@ -36,7 +36,7 @@ layers =
 ;     engine-is-stdlib-only   WP-01  ACTIVE
 ;     identifiers-narrow      WP-03  ACTIVE
 ;     annotate-narrow         WP-04  ACTIVE
-;     leaf-modules-narrow     WP-06 (packs)
+;     packs-narrow            WP-06  ACTIVE
 ;     emit-narrow             WP-09
 ;     manifest-narrow         WP-10
 ;
@@ -104,15 +104,15 @@ forbidden_modules =
     mintmark.identifiers
 allow_indirect_imports = False
 
-; [importlinter:contract:leaf-modules-narrow]
-; name = packs, identifiers and annotate import only engine
-; type = forbidden
-; source_modules =
-;     mintmark.packs
-;     mintmark.identifiers
-;     mintmark.annotate
-; forbidden_modules =
-;     mintmark.cli
-;     mintmark.manifest
-;     mintmark.emit
-; allow_indirect_imports = False
+[importlinter:contract:packs-narrow]
+name = packs imports only engine
+type = forbidden
+source_modules =
+    mintmark.packs
+forbidden_modules =
+    mintmark.cli
+    mintmark.manifest
+    mintmark.emit
+    mintmark.identifiers
+    mintmark.annotate
+allow_indirect_imports = False

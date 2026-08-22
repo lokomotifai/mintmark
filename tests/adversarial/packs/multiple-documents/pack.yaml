@@ -1,0 +1,10 @@
+schema_version: 1
+name: mintmark-fixture
+version: 0.1.0
+requires_core: ">=0.1,<0.2"
+locale: tr-TR
+allowed_identifier_policies: [safe]
+description: A minimal valid pack used as the baseline for adversarial fixtures.
+description_tr: Dusman fixture'lari icin taban olarak kullanilan gecerli paket.
+---
+schema_version: 1
