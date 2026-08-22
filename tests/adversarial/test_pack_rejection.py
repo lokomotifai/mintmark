@@ -12,6 +12,7 @@ while the merge key rule goes untested forever.
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 import jsonschema
@@ -19,12 +20,14 @@ import pytest
 import yaml
 
 from mintmark.packs.loader import MAX_YAML_BYTES, MAX_YAML_DEPTH, PackError, load_yaml
+from mintmark.packs.model import load_pack
 from mintmark.packs.semver import parse_range
 
 FIXTURES = Path(__file__).resolve().parent / "packs"
 SCHEMA_PATH = Path(__file__).resolve().parents[2] / "schemas" / "pack.schema.json"
 SCHEMA = yaml.safe_load(SCHEMA_PATH.read_text(encoding="utf-8"))
 VALIDATOR = jsonschema.Draft202012Validator(SCHEMA)
+EXAMPLE_PACK = SCHEMA_PATH.parent.parent / "packs" / "example"
 
 # Rules the strict loader enforces before a schema ever sees the document.
 LOADER_RULES = {
@@ -147,6 +150,28 @@ def test_yaml_symlink_is_not_followed(tmp_path: Path) -> None:
         load_yaml(link)
 
     assert caught.value.rule == "non-regular-file"
+
+
+def test_yaml_sets_are_rejected_before_they_can_affect_determinism(tmp_path: Path) -> None:
+    path = tmp_path / "set.yaml"
+    path.write_text("value: !!set {beta: null, alpha: null}\n", encoding="utf-8")
+
+    with pytest.raises(PackError, match="YAML sets are not allowed") as caught:
+        load_yaml(path)
+    assert caught.value.rule == "strict-yaml"
+
+
+def test_load_pack_always_enforces_the_running_core_version(tmp_path: Path) -> None:
+    pack = tmp_path / "pack"
+    shutil.copytree(EXAMPLE_PACK, pack)
+    path = pack / "pack.yaml"
+    document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    document["requires_core"] = ">=9.0,<10.0"
+    path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(PackError) as caught:
+        load_pack(pack)
+    assert caught.value.rule == "core-version-out-of-range"
 
 
 @pytest.mark.parametrize(

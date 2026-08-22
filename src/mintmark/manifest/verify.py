@@ -556,6 +556,9 @@ def _check_manifest_claims(
     else:
         if created.tzinfo is None:
             report.problems.append("provenance.created_utc has no timezone")
+    invocation = document["provenance"]["invocation"]
+    if any(character in invocation for character in ("\x00", "\r", "\n")):
+        report.problems.append("provenance.invocation contains control characters")
 
 
 def _check_spans(

@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shlex
 import shutil
 import sys
 import tempfile
@@ -128,12 +129,11 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    invocation = "mintmark " + " ".join(argv if argv is not None else sys.argv[1:])
 
     try:
         match args.command:
             case "mint":
-                return _cmd_mint(args, invocation)
+                return _cmd_mint(args, _mint_invocation(args))
             case "verify":
                 return _cmd_verify(args)
             case "reproduce":
@@ -158,6 +158,29 @@ def main(argv: Sequence[str] | None = None) -> int:
         return EXIT_VERIFY_FAILED
 
     return EXIT_USAGE
+
+
+def _mint_invocation(args: argparse.Namespace) -> str:
+    """Record replay-relevant CLI options without publishing workstation paths."""
+    tokens = [
+        "mintmark",
+        "mint",
+        "--pack",
+        "<pack>",
+        "--recipe",
+        args.recipe,
+        "--seed",
+        str(args.seed),
+        "--out",
+        "<output>",
+        "--identifier-policy",
+        args.identifier_policy,
+        "--format",
+        args.format,
+    ]
+    for override in args.records:
+        tokens.extend(("--records", override))
+    return shlex.join(tokens)
 
 
 def _parse_record_overrides(pairs: list[str]) -> dict[str, int]:

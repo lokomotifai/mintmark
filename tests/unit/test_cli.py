@@ -206,6 +206,17 @@ def test_mint_json_payload_has_the_documented_shape(tmp_path: Path, capsys) -> N
     assert payload["identifier_policy"] == "safe"
 
 
+def test_cli_manifest_does_not_publish_local_pack_or_output_paths(tmp_path: Path) -> None:
+    out = tmp_path / "private" / "run"
+    assert mint_to(out) == EXIT_OK
+    document = json.loads((out / "MINTMARK.json").read_text(encoding="utf-8"))
+    invocation = document["provenance"]["invocation"]
+    assert str(PACK) not in invocation
+    assert str(out) not in invocation
+    assert "<pack>" in invocation
+    assert "<output>" in invocation
+
+
 def test_verify_json_payload_has_the_documented_shape(tmp_path: Path, capsys) -> None:
     out = tmp_path / "run"
     mint_to(out)

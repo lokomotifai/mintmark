@@ -30,6 +30,7 @@ from yaml.constructor import ConstructorError
 from yaml.nodes import MappingNode, Node
 
 MERGE_TAG = "tag:yaml.org,2002:merge"
+SET_TAG = "tag:yaml.org,2002:set"
 MAX_YAML_BYTES = 1 << 20
 MAX_YAML_DEPTH = 64
 MAX_YAML_NODES = 100_000
@@ -121,6 +122,13 @@ class StrictLoader(yaml.SafeLoader):
             )
 
         event = self.peek_event()  # type: ignore[no-untyped-call]
+        if getattr(event, "tag", None) == SET_TAG:
+            raise ConstructorError(
+                None,
+                None,
+                "YAML sets are not allowed; declarations use ordered mappings or sequences",
+                getattr(event, "start_mark", None),
+            )
         if self._compose_depth >= MAX_YAML_DEPTH:
             raise ConstructorError(
                 None,

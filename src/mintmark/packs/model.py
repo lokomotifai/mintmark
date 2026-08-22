@@ -318,7 +318,11 @@ def load_pack(root: Path, *, core_version: str | None = None) -> Pack:
     _validate(manifest_path, manifest)
 
     requires_core = parse_range(manifest["requires_core"])
-    if core_version is not None and not requires_core.contains(core_version):
+    if core_version is None:
+        from mintmark import __version__
+
+        core_version = __version__
+    if not requires_core.contains(core_version):
         raise PackError(
             manifest_path,
             "requires_core",
