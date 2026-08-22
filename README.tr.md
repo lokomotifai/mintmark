@@ -13,7 +13,7 @@
 
 <p align="center">
   <a href="https://github.com/lokomotifai/mintmark/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/lokomotifai/mintmark/ci.yml?branch=main&amp;style=flat-square&amp;label=CI"></a>
-  <img alt="806 test" src="https://img.shields.io/badge/test-806-3C873A?style=flat-square">
+  <img alt="883 test" src="https://img.shields.io/badge/test-883-3C873A?style=flat-square">
   <img alt="18 invariant, her biri adlandırılmış testle" src="https://img.shields.io/badge/invariant-18%20test%20edildi-3C873A?style=flat-square">
   <a href="https://github.com/lokomotifai/mintmark/releases/tag/v0.1.3"><img alt="Sürüm v0.1.3" src="https://img.shields.io/badge/sürüm-v0.1.3-3C873A?style=flat-square"></a>
   <a href="https://pypi.org/project/mintmark/"><img alt="PyPI'de" src="https://img.shields.io/pypi/v/mintmark?style=flat-square&amp;label=PyPI&amp;color=3C873A"></a>
@@ -57,7 +57,7 @@ basıldığını söylemek için vurduğu küçük harftir. Bir Mintmark veri k�
 kendisini neyin ürettiğini hâlâ söyleyebilir.
 
 **PyPI'de [`mintmark`](https://pypi.org/project/mintmark/) olarak
-yayımlanmıştır.** 806 test geçiyor, on sekiz invariant'ın hepsinin adlandırılmış
+yayımlanmıştır.** 883 test geçiyor, on sekiz invariant'ın hepsinin adlandırılmış
 testi var ve bayt düzeyindeki determinizm iddiası tek bir platformdan varsayılmak
 yerine tek bir CI koşusunda üç platformda gözlemleniyor.
 
@@ -120,6 +120,7 @@ taxonomy: hushmark-tr v0.1, pin af11b31e4916
 label alignment: 100 documents, 81 spans
 dataset license: CC-BY-4.0
 attribution: mintmark-example 0.1.0 reference dataset (recipe demo, seed 42), lokomotifai, licensed CC-BY-4.0
+authenticity: self-consistency only; no trusted manifest digest supplied
 ```
 
 Bir test bu bloğu `verify`'ın gerçekten yazdığıyla karşılaştırır; böylece bu

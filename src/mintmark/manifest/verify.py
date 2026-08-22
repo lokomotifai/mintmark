@@ -108,7 +108,6 @@ class VerifyReport:
             f"label alignment: {self.documents_checked} documents, {self.spans_checked} spans",
             f"dataset license: {self.dataset_license}",
             f"attribution: {self.attribution}",
-            f"manifest sha256: {self.manifest_sha256}",
             f"authenticity: {self.authenticity}",
         ]
         lines.extend(f"PROBLEM: {problem}" for problem in self.problems)
