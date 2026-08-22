@@ -33,7 +33,7 @@ layers =
 ; layers, forbidden contracts have no optional syntax, so each one is
 ; activated by the milestone that creates its source module:
 ;
-;     engine-is-stdlib-only   WP-01
+;     engine-is-stdlib-only   WP-01  ACTIVE
 ;     leaf-modules-narrow     WP-03 (identifiers), WP-04 (annotate), WP-06 (packs)
 ;     emit-narrow             WP-09
 ;     manifest-narrow         WP-10
@@ -41,20 +41,20 @@ layers =
 ; Uncomment a contract in its owning milestone, never earlier and never later.
 ; WP-14's gate asserts that every contract below is active.
 ;
-; [importlinter:contract:engine-is-stdlib-only]
-; name = engine imports no other mintmark module
-; type = forbidden
-; source_modules =
-;     mintmark.engine
-; forbidden_modules =
-;     mintmark.cli
-;     mintmark.manifest
-;     mintmark.emit
-;     mintmark.annotate
-;     mintmark.identifiers
-;     mintmark.packs
-;     mintmark.lexicons
-; allow_indirect_imports = False
+[importlinter:contract:engine-is-stdlib-only]
+name = engine imports no other mintmark module
+type = forbidden
+source_modules =
+    mintmark.engine
+forbidden_modules =
+    mintmark.cli
+    mintmark.manifest
+    mintmark.emit
+    mintmark.annotate
+    mintmark.identifiers
+    mintmark.packs
+    mintmark.lexicons
+allow_indirect_imports = False
 
 ; [importlinter:contract:emit-narrow]
 ; name = emit imports only annotate and engine
