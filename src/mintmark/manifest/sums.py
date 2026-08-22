@@ -8,8 +8,10 @@ the artifacts.
 
 from __future__ import annotations
 
-import hashlib
+import re
 from pathlib import Path
+
+from mintmark.manifest.io import MAX_DATA_FILE_BYTES, digest_path, validate_filename
 
 SUMS_FILENAME = "SHA256SUMS"
 _SEPARATOR = "  "
@@ -17,11 +19,8 @@ _SEPARATOR = "  "
 
 def file_digest(path: Path) -> str:
     """SHA-256 of a file, lowercase hex, read in chunks."""
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1 << 20), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    digest, _ = digest_path(path, max_bytes=MAX_DATA_FILE_BYTES)
+    return digest
 
 
 def render_sums(entries: dict[str, str]) -> str:
@@ -41,7 +40,11 @@ def parse_sums(text: str) -> dict[str, str]:
         if not line:
             continue
         digest, separator, path = line.partition(_SEPARATOR)
-        if not separator or len(digest) != 64:
+        path = path.strip()
+        if not separator or not re.fullmatch(r"[0-9a-f]{64}", digest):
             raise ValueError(f"{SUMS_FILENAME} line {number} is malformed: {raw!r}")
-        entries[path.strip()] = digest
+        validate_filename(path)
+        if path in entries:
+            raise ValueError(f"{SUMS_FILENAME} line {number} duplicates {path!r}")
+        entries[path] = digest
     return entries

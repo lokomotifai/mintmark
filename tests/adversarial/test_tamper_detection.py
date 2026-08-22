@@ -10,6 +10,7 @@ asserts that verification notices and says what it noticed.
 from __future__ import annotations
 
 import json
+import os
 import shutil
 from pathlib import Path
 
@@ -120,6 +121,82 @@ def test_a_removed_data_file_is_caught(dataset: Path) -> None:
 def test_an_added_file_is_caught(dataset: Path) -> None:
     """A file nobody vouched for is as much a problem as an altered one."""
     (dataset / "extra.jsonl").write_text('{"smuggled":true}\n', encoding="utf-8")
+    assert main(["verify", str(dataset)]) == EXIT_VERIFY_FAILED
+
+
+@pytest.mark.adversarial
+def test_manifest_output_path_cannot_escape_the_dataset(dataset: Path, tmp_path: Path) -> None:
+    outside = tmp_path / "outside.jsonl"
+    outside.write_text("secret\n", encoding="utf-8")
+    path = dataset / MANIFEST_FILENAME
+    document = json.loads(path.read_text(encoding="utf-8"))
+    document["outputs"][0]["path"] = "../outside.jsonl"
+    path.write_text(json.dumps(document) + "\n", encoding="utf-8")
+
+    assert main(["verify", str(dataset)]) == EXIT_VERIFY_FAILED
+    assert outside.read_text(encoding="utf-8") == "secret\n"
+
+
+@pytest.mark.adversarial
+def test_duplicate_manifest_output_paths_are_rejected(dataset: Path) -> None:
+    path = dataset / MANIFEST_FILENAME
+    document = json.loads(path.read_text(encoding="utf-8"))
+    document["outputs"].append(dict(document["outputs"][0]))
+    path.write_text(json.dumps(document) + "\n", encoding="utf-8")
+    assert main(["verify", str(dataset)]) == EXIT_VERIFY_FAILED
+
+
+@pytest.mark.adversarial
+def test_duplicate_checksum_paths_are_rejected(dataset: Path) -> None:
+    path = dataset / SUMS_FILENAME
+    first = path.read_text(encoding="utf-8").splitlines()[0]
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(first + "\n")
+    assert main(["verify", str(dataset)]) == EXIT_VERIFY_FAILED
+
+
+@pytest.mark.adversarial
+def test_output_symlink_is_not_followed(dataset: Path, tmp_path: Path) -> None:
+    outside = tmp_path / "outside.jsonl"
+    outside.write_text("do not read\n", encoding="utf-8")
+    output = dataset / "customer.jsonl"
+    output.unlink()
+    output.symlink_to(outside)
+    assert main(["verify", str(dataset)]) == EXIT_VERIFY_FAILED
+    assert outside.read_text(encoding="utf-8") == "do not read\n"
+
+
+@pytest.mark.adversarial
+def test_sums_symlink_is_not_followed(dataset: Path, tmp_path: Path) -> None:
+    outside = tmp_path / "outside"
+    outside.write_text("sensitive material\n", encoding="utf-8")
+    sums = dataset / SUMS_FILENAME
+    sums.unlink()
+    sums.symlink_to(outside)
+    assert main(["verify", str(dataset)]) == EXIT_VERIFY_FAILED
+
+
+@pytest.mark.adversarial
+def test_special_file_is_rejected_without_blocking(dataset: Path) -> None:
+    if not hasattr(os, "mkfifo"):
+        pytest.skip("named pipes are unavailable")
+    output = dataset / "customer.jsonl"
+    output.unlink()
+    os.mkfifo(output)
+    assert main(["verify", str(dataset)]) == EXIT_VERIFY_FAILED
+
+
+@pytest.mark.adversarial
+def test_duplicate_manifest_json_keys_fail_closed(dataset: Path) -> None:
+    (dataset / MANIFEST_FILENAME).write_text(
+        '{"mintmark": {}, "mintmark": {}}\n', encoding="utf-8"
+    )
+    assert main(["verify", str(dataset)]) == EXIT_VERIFY_FAILED
+
+
+@pytest.mark.adversarial
+def test_oversized_manifest_fails_with_a_verification_result(dataset: Path) -> None:
+    (dataset / MANIFEST_FILENAME).write_text(" " * ((4 << 20) + 1), encoding="utf-8")
     assert main(["verify", str(dataset)]) == EXIT_VERIFY_FAILED
 
 

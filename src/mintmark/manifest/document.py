@@ -24,6 +24,8 @@ from dataclasses import field as dataclass_field
 from pathlib import Path
 from typing import Any
 
+from mintmark.manifest.io import MAX_CONTROL_FILE_BYTES, DatasetIOError, DatasetReader
+
 MANIFEST_FILENAME = "MINTMARK.json"
 SCHEMA_VERSION = 2
 
@@ -211,12 +213,35 @@ def comparable(document: dict[str, Any]) -> dict[str, Any]:
     return dict(stripped)
 
 
-def read_manifest(directory: Path) -> dict[str, Any]:
-    path = Path(directory) / MANIFEST_FILENAME
-    if not path.exists():
-        raise FileNotFoundError(
-            f"no {MANIFEST_FILENAME} in {directory}. A dataset without its manifest "
-            "is not a Mintmark deliverable: nothing binds the files to what produced them."
-        )
-    document: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"{MANIFEST_FILENAME}: duplicate object key {key!r}")
+        result[key] = value
+    return result
+
+
+def read_manifest(directory: Path, *, reader: DatasetReader | None = None) -> dict[str, Any]:
+    """Read a bounded manifest without following filesystem or JSON aliases."""
+    owned_reader = reader is None
+    active = reader
+    try:
+        if active is None:
+            active = DatasetReader(Path(directory))
+        text = active.read_text(MANIFEST_FILENAME, max_bytes=MAX_CONTROL_FILE_BYTES)
+        document = json.loads(text, object_pairs_hook=_unique_object)
+    except DatasetIOError as exc:
+        raise ValueError(str(exc)) from exc
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            f"{MANIFEST_FILENAME}: invalid JSON at line {exc.lineno}, column {exc.colno}"
+        ) from exc
+    except RecursionError as exc:
+        raise ValueError(f"{MANIFEST_FILENAME}: JSON nesting is too deep") from exc
+    finally:
+        if owned_reader and active is not None:
+            active.close()
+    if not isinstance(document, dict):
+        raise ValueError(f"{MANIFEST_FILENAME}: top level must be an object")
     return document

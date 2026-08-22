@@ -21,15 +21,23 @@ import re
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
+from itertools import islice
 from pathlib import Path
 from typing import Any
 
 import jsonschema
 
 from mintmark.manifest.document import MANIFEST_FILENAME, VALIDATOR_WARNING, read_manifest
-from mintmark.manifest.sums import SUMS_FILENAME, file_digest, parse_sums
+from mintmark.manifest.io import (
+    MAX_CONTROL_FILE_BYTES,
+    MAX_DATA_FILE_BYTES,
+    DatasetIOError,
+    DatasetReader,
+)
+from mintmark.manifest.sums import SUMS_FILENAME, parse_sums
 
 Validator = Callable[[str], bool]
+MAX_SCHEMA_PROBLEMS = 100
 
 
 @dataclass(slots=True)
@@ -97,44 +105,87 @@ def verify(
     directory = Path(directory)
     report = VerifyReport(directory=str(directory))
 
-    document = read_manifest(directory)
-
-    errors = sorted(
-        jsonschema.Draft202012Validator(schema).iter_errors(document),
-        key=lambda e: list(e.absolute_path),
-    )
-    report.schema_valid = not errors
-    for error in errors:
-        location = "/".join(str(part) for part in error.absolute_path) or "document"
-        report.problems.append(f"{MANIFEST_FILENAME}: {location}: {error.message}")
-    if errors:
+    try:
+        reader = DatasetReader(directory)
+    except (DatasetIOError, OSError, ValueError) as exc:
+        report.problems.append(str(exc))
         return report
 
-    report.identifier_policy = document["identifier_policy"]
-    # Reported rather than merely stored. Somebody running verify on a dataset
-    # they downloaded is exactly the person who needs to know the terms, and the
-    # credit line they would otherwise have to assemble by hand.
-    report.dataset_license = document["license"]["datasets"]
-    report.attribution = document["license"]["attribution"]
-    taxonomy = document["taxonomy"]
-    report.taxonomy_pin = (
-        f"{taxonomy['name']} v{taxonomy['version']}, pin {taxonomy['pin_digest'][:12]}"
-    )
+    with reader:
+        try:
+            document = read_manifest(directory, reader=reader)
+        except (OSError, ValueError) as exc:
+            report.problems.append(str(exc))
+            return report
 
-    if expected_taxonomy_pin is not None and taxonomy["pin_digest"] != expected_taxonomy_pin:
-        report.problems.append(
-            f"taxonomy pin {taxonomy['pin_digest']} does not match this engine's "
-            f"{expected_taxonomy_pin}; the dataset was minted against a different label set"
+        try:
+            errors = list(
+                islice(
+                    jsonschema.Draft202012Validator(schema).iter_errors(document),
+                    MAX_SCHEMA_PROBLEMS + 1,
+                )
+            )
+        except (RecursionError, TypeError, ValueError) as exc:
+            report.problems.append(f"{MANIFEST_FILENAME}: schema validation failed safely: {exc}")
+            return report
+        report.schema_valid = not errors
+        for error in errors[:MAX_SCHEMA_PROBLEMS]:
+            location = "/".join(str(part) for part in error.absolute_path) or "document"
+            report.problems.append(f"{MANIFEST_FILENAME}: {location}: {error.message}")
+        if len(errors) > MAX_SCHEMA_PROBLEMS:
+            report.problems.append(
+                f"{MANIFEST_FILENAME}: more than {MAX_SCHEMA_PROBLEMS} schema problems; "
+                "remaining errors omitted"
+            )
+        if errors:
+            return report
+
+        report.identifier_policy = document["identifier_policy"]
+        # Reported rather than merely stored. Somebody running verify on a dataset
+        # they downloaded is exactly the person who needs to know the terms, and the
+        # credit line they would otherwise have to assemble by hand.
+        report.dataset_license = document["license"]["datasets"]
+        report.attribution = document["license"]["attribution"]
+        taxonomy = document["taxonomy"]
+        report.taxonomy_pin = (
+            f"{taxonomy['name']} v{taxonomy['version']}, pin {taxonomy['pin_digest'][:12]}"
         )
 
-    _check_validator_warning(document, report)
-    _check_checksums(directory, document, report)
-    _check_sums_file(directory, document, report)
-    _check_spans(directory, report)
-    if report.identifier_policy == "safe":
-        _sweep_identifiers(directory, validators, report)
+        if expected_taxonomy_pin is not None and taxonomy["pin_digest"] != expected_taxonomy_pin:
+            report.problems.append(
+                f"taxonomy pin {taxonomy['pin_digest']} does not match this engine's "
+                f"{expected_taxonomy_pin}; the dataset was minted against a different label set"
+            )
+
+        if not _check_manifest_semantics(document, report):
+            return report
+        _check_validator_warning(document, report)
+        _check_checksums(reader, document, report)
+        _check_sums_file(reader, document, report)
+        _check_spans(reader, document, report)
+        if report.identifier_policy == "safe":
+            _sweep_identifiers(reader, document, validators, report)
 
     return report
+
+
+def _check_manifest_semantics(document: dict[str, Any], report: VerifyReport) -> bool:
+    """Enforce cross-field constraints JSON Schema cannot express."""
+    paths = [output["path"] for output in document["outputs"]]
+    duplicates = sorted({path for path in paths if paths.count(path) > 1})
+    for path in duplicates:
+        report.problems.append(f"{MANIFEST_FILENAME}: duplicate output path {path!r}")
+    for reserved in (MANIFEST_FILENAME, SUMS_FILENAME):
+        if reserved in paths:
+            report.problems.append(f"{MANIFEST_FILENAME}: outputs may not claim {reserved}")
+    try:
+        seed = int(document["seed"])
+    except ValueError:
+        report.problems.append(f"{MANIFEST_FILENAME}: seed is not an integer")
+    else:
+        if not 0 <= seed < 1 << 64:
+            report.problems.append(f"{MANIFEST_FILENAME}: seed is outside the u64 range")
+    return not report.problems
 
 
 def _check_validator_warning(document: dict[str, Any], report: VerifyReport) -> None:
@@ -155,21 +206,22 @@ def _check_validator_warning(document: dict[str, Any], report: VerifyReport) -> 
         report.problems.append("validator_warning present under a safe policy")
 
 
-def _check_checksums(directory: Path, document: dict[str, Any], report: VerifyReport) -> None:
+def _check_checksums(
+    reader: DatasetReader, document: dict[str, Any], report: VerifyReport
+) -> None:
     for output in document["outputs"]:
-        path = directory / output["path"]
         report.checksums_checked += 1
-        if not path.exists():
-            report.problems.append(f"{output['path']}: listed in the manifest but missing")
+        try:
+            actual, size = reader.digest(output["path"], max_bytes=MAX_DATA_FILE_BYTES)
+        except (DatasetIOError, OSError) as exc:
+            report.problems.append(str(exc))
             continue
-        actual = file_digest(path)
         if actual != output["sha256"]:
             report.problems.append(
                 f"{output['path']}: checksum mismatch\n"
                 f"  recorded {output['sha256']}\n  actual   {actual}"
             )
             continue
-        size = path.stat().st_size
         if size != output["bytes"]:
             report.problems.append(
                 f"{output['path']}: size {size} does not match the recorded {output['bytes']}"
@@ -177,24 +229,32 @@ def _check_checksums(directory: Path, document: dict[str, Any], report: VerifyRe
             continue
         report.checksums_matched += 1
 
-    listed = {output["path"] for output in document["outputs"]}
-    for path in sorted(directory.rglob("*")):
-        if not path.is_file():
-            continue
-        relative = path.relative_to(directory).as_posix()
-        if relative in {MANIFEST_FILENAME, SUMS_FILENAME} or relative in listed:
-            continue
-        report.problems.append(f"{relative}: present in the directory but absent from the manifest")
-
-
-def _check_sums_file(directory: Path, document: dict[str, Any], report: VerifyReport) -> None:
-    path = directory / SUMS_FILENAME
-    if not path.exists():
-        report.problems.append(f"no {SUMS_FILENAME}")
-        return
+    listed = {output["path"] for output in document["outputs"]} | {
+        MANIFEST_FILENAME,
+        SUMS_FILENAME,
+    }
     try:
-        recorded = parse_sums(path.read_text(encoding="utf-8"))
-    except ValueError as exc:
+        entries = reader.entries()
+    except (DatasetIOError, OSError) as exc:
+        report.problems.append(str(exc))
+        return
+    for entry in entries:
+        if entry.kind != "file":
+            report.problems.append(f"{entry.name}: unsafe dataset entry type: {entry.kind}")
+        if entry.name not in listed:
+            report.problems.append(
+                f"{entry.name}: present in the directory but absent from the manifest"
+            )
+
+
+def _check_sums_file(
+    reader: DatasetReader, document: dict[str, Any], report: VerifyReport
+) -> None:
+    try:
+        recorded = parse_sums(
+            reader.read_text(SUMS_FILENAME, max_bytes=MAX_CONTROL_FILE_BYTES)
+        )
+    except (DatasetIOError, OSError, ValueError) as exc:
         report.problems.append(str(exc))
         return
     for output in document["outputs"]:
@@ -207,11 +267,19 @@ def _check_sums_file(directory: Path, document: dict[str, Any], report: VerifyRe
     # checked against the manifest file on disk instead.
     if MANIFEST_FILENAME not in recorded:
         report.problems.append(f"{SUMS_FILENAME} does not cover {MANIFEST_FILENAME}")
-    elif recorded[MANIFEST_FILENAME] != file_digest(directory / MANIFEST_FILENAME):
-        report.problems.append(
-            f"{MANIFEST_FILENAME}: {SUMS_FILENAME} records a digest that does not "
-            "match the manifest on disk"
-        )
+    else:
+        try:
+            manifest_digest, _ = reader.digest(
+                MANIFEST_FILENAME, max_bytes=MAX_CONTROL_FILE_BYTES
+            )
+        except (DatasetIOError, OSError) as exc:
+            report.problems.append(str(exc))
+        else:
+            if recorded[MANIFEST_FILENAME] != manifest_digest:
+                report.problems.append(
+                    f"{MANIFEST_FILENAME}: {SUMS_FILENAME} records a digest that does not "
+                    "match the manifest on disk"
+                )
 
     expected = {output["path"] for output in document["outputs"]} | {MANIFEST_FILENAME}
     for extra in sorted(set(recorded) - expected):
@@ -220,66 +288,100 @@ def _check_sums_file(directory: Path, document: dict[str, Any], report: VerifyRe
         report.problems.append(f"{SUMS_FILENAME} omits {missing!r}")
 
 
-def _check_spans(directory: Path, report: VerifyReport) -> None:
+def _check_spans(
+    reader: DatasetReader, document: dict[str, Any], report: VerifyReport
+) -> None:
     """Re-extract every span from the text it indexes."""
     import hashlib
 
-    for sidecar in sorted(directory.glob("*.labels.jsonl")):
-        stem = sidecar.name.removesuffix(".labels.jsonl")
-        data_path = _find_data_file(directory, stem)
-        if data_path is None:
-            report.problems.append(f"{sidecar.name}: no data file named {stem}")
+    names = {output["path"] for output in document["outputs"]}
+    for sidecar_name in sorted(name for name in names if name.endswith(".labels.jsonl")):
+        stem = sidecar_name.removesuffix(".labels.jsonl")
+        data_name = _find_data_file(names, stem)
+        if data_name is None:
+            report.problems.append(f"{sidecar_name}: no data file named {stem}")
             continue
 
-        texts = _document_texts(data_path)
-        for number, line in enumerate(sidecar.read_text(encoding="utf-8").splitlines(), start=1):
+        try:
+            texts = _document_texts(reader, data_name)
+            sidecar_text = reader.read_text(sidecar_name, max_bytes=MAX_DATA_FILE_BYTES)
+        except (DatasetIOError, OSError, ValueError) as exc:
+            report.problems.append(str(exc))
+            continue
+        for number, line in enumerate(sidecar_text.splitlines(), start=1):
             if not line.strip():
                 continue
-            record = json.loads(line)
+            try:
+                record = json.loads(line)
+            except (json.JSONDecodeError, RecursionError):
+                report.problems.append(f"{sidecar_name} line {number}: not valid JSON")
+                continue
             report.documents_checked += 1
+            if not isinstance(record, dict) or not isinstance(record.get("doc_id"), str):
+                report.problems.append(f"{sidecar_name} line {number}: malformed sidecar record")
+                continue
             text = texts.get(record["doc_id"])
             if text is None:
                 report.problems.append(
-                    f"{sidecar.name} line {number}: no document {record['doc_id']}"
+                    f"{sidecar_name} line {number}: no document {record['doc_id']}"
                 )
+                continue
+            if not isinstance(record.get("text_sha256"), str) or not isinstance(
+                record.get("spans"), list
+            ):
+                report.problems.append(f"{sidecar_name} line {number}: malformed sidecar record")
                 continue
             actual_digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
             if actual_digest != record["text_sha256"]:
                 report.problems.append(
-                    f"{sidecar.name} line {number}: text_sha256 does not match the document"
+                    f"{sidecar_name} line {number}: text_sha256 does not match the document"
                 )
                 continue
             for span in record["spans"]:
                 report.spans_checked += 1
-                if span["end"] > len(text) or span["start"] < 0:
+                if (
+                    not isinstance(span, dict)
+                    or not isinstance(span.get("start"), int)
+                    or not isinstance(span.get("end"), int)
+                ):
+                    report.problems.append(f"{sidecar_name} line {number}: malformed span")
+                    continue
+                if span["end"] > len(text) or span["start"] < 0 or span["start"] >= span["end"]:
                     report.problems.append(
-                        f"{sidecar.name} line {number}: span [{span['start']}, {span['end']}) "
+                        f"{sidecar_name} line {number}: span [{span['start']}, {span['end']}) "
                         f"falls outside a {len(text)} character document"
                     )
                 elif not text[span["start"] : span["end"]].strip():
                     report.problems.append(
-                        f"{sidecar.name} line {number}: span [{span['start']}, "
+                        f"{sidecar_name} line {number}: span [{span['start']}, "
                         f"{span['end']}) covers only whitespace"
                     )
 
 
-def _find_data_file(directory: Path, stem: str) -> Path | None:
+def _find_data_file(names: set[str], stem: str) -> str | None:
     for suffix in (".jsonl", ".csv"):
-        candidate = directory / f"{stem}{suffix}"
-        if candidate.exists():
+        candidate = f"{stem}{suffix}"
+        if candidate in names:
             return candidate
     return None
 
 
-def _document_texts(path: Path) -> dict[str, str]:
+def _document_texts(reader: DatasetReader, name: str) -> dict[str, str]:
     """Map document id to text, for whichever field carries the document."""
     texts: dict[str, str] = {}
-    if path.suffix != ".jsonl":
+    if not name.endswith(".jsonl"):
         return texts
-    for line in path.read_text(encoding="utf-8").splitlines():
+    for number, line in enumerate(
+        reader.read_text(name, max_bytes=MAX_DATA_FILE_BYTES).splitlines(), start=1
+    ):
         if not line.strip():
             continue
-        record = json.loads(line)
+        try:
+            record = json.loads(line)
+        except (json.JSONDecodeError, RecursionError) as exc:
+            raise ValueError(f"{name} line {number}: not valid JSON") from exc
+        if not isinstance(record, dict):
+            continue
         doc_id = next((v for k, v in record.items() if k.endswith("_id")), None)
         if doc_id is None:
             continue
@@ -309,7 +411,10 @@ def _string_values(value: object) -> Iterable[str]:
 
 
 def _sweep_identifiers(
-    directory: Path, validators: dict[str, Validator], report: VerifyReport
+    reader: DatasetReader,
+    document: dict[str, Any],
+    validators: dict[str, Validator],
+    report: VerifyReport,
 ) -> None:
     """Invariant 2, checked on the artifacts rather than on the generator.
 
@@ -325,36 +430,47 @@ def _sweep_identifiers(
     Scanning parsed values but matching unanchored would have the same problem
     inside any long alphanumeric field, so the pattern is anchored on both sides.
     """
-    for path in sorted(directory.glob("*.jsonl")):
-        if path.name.endswith(".labels.jsonl"):
+    names = sorted(output["path"] for output in document["outputs"])
+    for name in (item for item in names if item.endswith(".jsonl")):
+        if name.endswith(".labels.jsonl"):
             continue
-        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        try:
+            text = reader.read_text(name, max_bytes=MAX_DATA_FILE_BYTES)
+        except (DatasetIOError, OSError) as exc:
+            report.problems.append(str(exc))
+            continue
+        for number, line in enumerate(text.splitlines(), start=1):
             if not line.strip():
                 continue
             try:
                 record = json.loads(line)
             except json.JSONDecodeError:
-                report.problems.append(f"{path.name} line {number}: not valid JSON")
+                report.problems.append(f"{name} line {number}: not valid JSON")
                 continue
             for value in _string_values(record):
                 for candidate in set(_CANDIDATE.findall(value)):
-                    for name, validator in validators.items():
+                    for validator_name, validator in validators.items():
                         if validator(candidate):
                             report.checksum_valid_identifiers += 1
                             report.problems.append(
-                                f"{path.name} line {number}: {candidate!r} is a "
-                                f"checksum-valid {name} under a safe policy; safe mode "
+                                f"{name} line {number}: {candidate!r} is a "
+                                f"checksum-valid {validator_name} under a safe policy; safe mode "
                                 "is the product's safety claim"
                             )
 
-    for path in sorted(directory.glob("*.csv")):
-        text = path.read_text(encoding="utf-8")
+    for name in (item for item in names if item.endswith(".csv")):
+        try:
+            text = reader.read_text(name, max_bytes=MAX_DATA_FILE_BYTES)
+        except (DatasetIOError, OSError) as exc:
+            report.problems.append(str(exc))
+            continue
         for candidate in set(_CANDIDATE.findall(text)):
-            for name, validator in validators.items():
+            for validator_name, validator in validators.items():
                 if validator(candidate):
                     report.checksum_valid_identifiers += 1
                     report.problems.append(
-                        f"{path.name}: {candidate!r} is a checksum-valid {name} under a safe policy"
+                        f"{name}: {candidate!r} is a checksum-valid {validator_name} "
+                        "under a safe policy"
                     )
 
 
