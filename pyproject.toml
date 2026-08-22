@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mintmark"
-version = "0.1.3"
+version = "0.2.0"
 description = "Deterministic, fully synthetic, Turkish-first labeled datasets with a provenance manifest."
 readme = "README.md"
 requires-python = ">=3.12,<3.13"

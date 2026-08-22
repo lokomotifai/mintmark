@@ -45,9 +45,13 @@ CODE_LICENSE = "Apache-2.0"
 VALIDATOR_WARNING = (
     'This dataset was minted with identifier policy "validator". It contains '
     "checksum-valid synthetic identifiers intended solely for testing validation "
-    "logic. The values are fictional and belong to no real person, account, or "
-    "institution. Do not use this dataset where checksum-valid identifiers could "
-    "be mistaken for real ones."
+    "logic. Three of them stay unusable by construction whatever the policy: an "
+    "IBAN carries a bank code no institution holds, a PAN begins with a major "
+    "industry identifier no card network uses, and an email address sits under a "
+    "reserved documentation name. A TCKN and a VKN have no such reserved range, "
+    "so a checksum-valid one is indistinguishable from an issued number and may "
+    "coincide with one. Do not use this dataset where checksum-valid identifiers "
+    "could be mistaken for real ones, and never use it to contact anyone."
 )
 
 DETERMINISM_CLAIM = (

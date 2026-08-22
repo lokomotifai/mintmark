@@ -95,7 +95,12 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="TYPE=N",
         help="override a recipe's count for one record type; may repeat",
     )
-    mint_parser.add_argument("--identifier-policy", choices=["safe", "validator"], default="safe")
+    mint_parser.add_argument(
+        "--identifier-policy",
+        choices=["safe", "validator"],
+        default=None,
+        help="only needed when the recipe does not name one; a recipe that does, decides",
+    )
     mint_parser.add_argument("--format", choices=["jsonl", "csv"], default="jsonl")
     mint_parser.add_argument("--json", action="store_true")
 
@@ -445,7 +450,6 @@ def _cmd_packcheck(args: argparse.Namespace) -> int:
                     recipe=recipe_name,
                     seed=1,
                     out=out,
-                    identifier_policy="safe",
                     records=overrides,
                     invocation="mintmark packcheck",
                 )

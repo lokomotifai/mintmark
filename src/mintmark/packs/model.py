@@ -42,8 +42,13 @@ MAX_DECIMAL_PLACES = 19
 MAX_DECLARATION_FILES = 1_024
 MAX_RECORD_TYPES = 128
 MAX_RECIPES = 128
-MAX_RECORDS_PER_TYPE = 50_000
-MAX_TOTAL_RECORDS = 100_000
+# Calibrated above the largest declaration this pack family publishes, not below
+# it. At 50_000 and 100_000 these refused mintmark-banking's 250_000 transactions
+# and mintmark-hr's 72_000 payroll entries, which are the shapes those packs
+# exist to produce. A bound that refuses the project's own reference datasets
+# stops nothing an attacker wanted and stops the product.
+MAX_RECORDS_PER_TYPE = 1_000_000
+MAX_TOTAL_RECORDS = 2_000_000
 MAX_TEMPLATE_ENTRIES_PER_SET = 4_096
 MAX_LEXICON_ITEMS = 100_000
 MAX_LEXICON_VALUE_CHARS = 4_096
@@ -138,10 +143,8 @@ class Recipe:
     records: dict[str, int]
     date_window: DateWindow
     special_rate: str
-    doc_mix: dict[str, str] = dataclass_field(default_factory=dict)
     coverage_targets: dict[str, int] = dataclass_field(default_factory=dict)
     identifier_policy: str | None = None
-    emit_child_outside_window: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -161,6 +164,7 @@ class Pack:
     requires_core: CoreRange
     locale: str
     allowed_identifier_policies: tuple[str, ...]
+    entity_lexicons: dict[str, tuple[str, ...]]
     description: str
     description_tr: str
     dataset_license: str
@@ -332,9 +336,14 @@ def load_pack(root: Path, *, core_version: str | None = None) -> Pack:
     record_types = _load_record_types(root)
     template_sets = _load_template_sets(root)
     lexicons = _load_lexicons(root)
+    entity_lexicons = {
+        label: tuple(names) for label, names in sorted(manifest.get("entity_lexicons", {}).items())
+    }
     recipes = _load_recipes(root, record_types)
 
-    _cross_validate(root, record_types, recipes, template_sets, lexicons)
+    _cross_validate(
+        root, record_types, recipes, template_sets, lexicons, entity_lexicons, manifest_path
+    )
 
     try:
         final_digest = pack_digest(root)
@@ -355,6 +364,7 @@ def load_pack(root: Path, *, core_version: str | None = None) -> Pack:
         requires_core=requires_core,
         locale=manifest["locale"],
         allowed_identifier_policies=tuple(manifest["allowed_identifier_policies"]),
+        entity_lexicons=entity_lexicons,
         description=manifest["description"],
         description_tr=manifest["description_tr"],
         dataset_license=manifest["dataset_license"],
@@ -443,15 +453,11 @@ def _load_recipes(root: Path, record_types: tuple[RecordType, ...]) -> dict[str,
             records=dict(document["records"]),
             date_window=window,
             special_rate=document["special_rate"],
-            doc_mix=dict(document.get("doc_mix", {})),
             coverage_targets=dict(document.get("coverage_targets", {})),
             identifier_policy=document.get("identifier_policy"),
-            emit_child_outside_window=document.get("emit_child_outside_window", True),
         )
         _validate_record_counts(path, recipe.records)
         _validate_probability(path, "special_rate", recipe.special_rate)
-        for set_name, rate in recipe.doc_mix.items():
-            _validate_probability(path, f"doc_mix/{set_name}", rate)
         if recipe.name in recipes:
             raise PackError(path, "name", "duplicate-recipe", f"{recipe.name!r} declared twice")
         recipes[recipe.name] = recipe
@@ -550,6 +556,8 @@ def _cross_validate(
     recipes: dict[str, Recipe],
     template_sets: dict[str, tuple[TemplateEntry, ...]],
     lexicons: dict[str, tuple[str, ...]],
+    entity_lexicons: dict[str, tuple[str, ...]],
+    manifest_path: Path,
 ) -> None:
     """The checks no single file can make about itself."""
     path = root / "fields"
@@ -608,16 +616,72 @@ def _cross_validate(
                 path, record_type, declared, known_types, order_of, template_sets, lexicons
             )
 
-    for name, recipe in recipes.items():
-        for set_name in recipe.doc_mix:
-            if set_name not in template_sets:
+    _check_everything_declared_is_reachable(
+        root, record_types, template_sets, lexicons, entity_lexicons, manifest_path
+    )
+
+
+LEX_SLOT = re.compile(r"\{lex:\s*([a-z][a-z0-9_]*)\s*\}")
+
+
+def _check_everything_declared_is_reachable(
+    root: Path,
+    record_types: tuple[RecordType, ...],
+    template_sets: dict[str, tuple[TemplateEntry, ...]],
+    lexicons: dict[str, tuple[str, ...]],
+    entity_lexicons: dict[str, tuple[str, ...]],
+    manifest_path: Path,
+) -> None:
+    """Nothing a pack ships may be unreachable from the generators.
+
+    A lexicon no generator names, or a template set no field draws from, is a file
+    that looks like data and reaches none. The failure is silent and durable: it
+    survives review, it survives the denylist scan, and the tests written to guard
+    it guard nothing. Both are refused by name instead.
+    """
+    for label, names in sorted(entity_lexicons.items()):
+        for name in names:
+            if name not in lexicons:
                 raise PackError(
-                    root / "recipes" / f"{name}.yaml",
-                    f"doc_mix/{set_name}",
-                    "unknown-template-set",
-                    f"no template set named {set_name!r}; declared: "
-                    + (", ".join(sorted(template_sets)) or "none"),
+                    manifest_path,
+                    f"entity_lexicons/{label}",
+                    "unknown-lexicon",
+                    f"names lexicon {name!r}, which this pack does not declare; declared: "
+                    + (", ".join(sorted(lexicons)) or "none"),
                 )
+
+    named_sets = {
+        f.generator_argument
+        for record_type in record_types
+        for f in record_type.fields
+        if f.generator_kind == "grammar"
+    }
+    for set_name in sorted(set(template_sets) - named_sets):
+        raise PackError(
+            root / "templates" / set_name,
+            "templates",
+            "unreachable-template-set",
+            f"no field declares grammar:{set_name}, so nothing ever renders it",
+        )
+
+    named_lexicons = {
+        f.generator_argument
+        for record_type in record_types
+        for f in record_type.fields
+        if f.generator_kind == "lexicon"
+    }
+    named_lexicons |= {name for names in entity_lexicons.values() for name in names}
+    for entries in template_sets.values():
+        for entry in entries:
+            named_lexicons |= set(LEX_SLOT.findall(entry.text))
+    for name in sorted(set(lexicons) - named_lexicons):
+        raise PackError(
+            root / "lexicons" / f"{name}.yaml",
+            "lexicons",
+            "unreachable-lexicon",
+            f"nothing draws from {name!r}: no field generator, no entity_lexicons "
+            "entry, and no {lex:...} slot names it",
+        )
 
 
 def _validate_field(

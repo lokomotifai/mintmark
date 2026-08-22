@@ -1,6 +1,6 @@
 name: mintmark-fixture
 version: 0.1.0
-requires_core: ">=0.1,<0.2"
+requires_core: ">=0.2,<0.3"
 locale: tr-TR
 allowed_identifier_policies: [safe]
 description: A minimal valid pack used as the baseline for adversarial fixtures.

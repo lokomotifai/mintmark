@@ -230,6 +230,8 @@ def test_verify_json_payload_has_the_documented_shape(tmp_path: Path, capsys) ->
         "checksums",
         "identifier_policy",
         "checksum_valid_identifiers",
+        "coverage_checked",
+        "coverage_targets_checked",
         "documents_checked",
         "spans_checked",
         "taxonomy_pin",

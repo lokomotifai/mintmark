@@ -6,8 +6,8 @@
   "identifier_policy": "safe",
   "digests": {
     "customer.jsonl": "f968b01fcef05728dd86393d827f43e81d92548ecbab5ac015382cb4f807d2d5",
-    "transaction.jsonl": "45b09305e645844ce4d3e9aab4bf0799814456c3dc9dd4d6d9d96940576b82c9",
-    "transaction.labels.jsonl": "8f461a6a707af968fd3b9c2c60ff9e34b9fe4d4627eb38b56a5aa2b677954bc2"
+    "transaction.jsonl": "252a68a2f111db1dcd0b1a02ae0e2cb3698833b0da16b0ca5a926c5be1f00fe0",
+    "transaction.labels.jsonl": "87ab4ae3f02380f497fa9d48b0c2508bdbbeae679b8f5f6309234d6e6d939a9d"
   },
   "regenerated": [
     {
@@ -17,6 +17,10 @@
     {
       "date": "2026-08-22",
       "reason": "A fictional organization name was removed from the ORG descriptor lexicon after it turned out to be a real Turkish financial brand. Removing a lexicon entry changes the draw for every subsequent index, so emitted bytes moved for a fixed seed. Same rule as the previous entry: a major version event, harmless only because nothing is published."
+    },
+    {
+      "date": "2026-08-23",
+      "reason": "Template selection began honouring the declared weight on each template entry. Every template set carried one, the schema required it, and the renderer picked uniformly regardless, so a set declared at 0.35/0.25/0.25/0.15 emitted an even quarter each. Honouring the weight changes which template every document draws, so emitted bytes moved for a fixed seed. A major version event under this project's own rule, taken at 0.2.0 and harmless only because nothing has been published: no manifest exists that this breaks. The same release also composed the PERSON descriptor pool from the core given-name and surname lexicons instead of listing twelve full names, and let a pack contribute its own surfaces to an entity label. Both change which surface each draw lands on, so they move bytes for the same reason and are recorded in the same entry. The special-category, organization, and address descriptor lists were also widened, because four surfaces for SEXUAL_LIFE across five hundred spans is a vocabulary a detector can memorize rather than detect."
     }
   ]
 }

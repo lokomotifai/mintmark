@@ -66,6 +66,21 @@
         "CC0-1.0"
       ],
       "description": "SPDX identifier for the terms covering datasets minted from this pack. An enum rather than a free string, because the engine writes this into every manifest it produces and a typo would put unenforceable terms on a published artifact."
+    },
+    "entity_lexicons": {
+      "type": "object",
+      "description": "Extra surfaces this pack contributes to an entity label, by lexicon name. Merged after the core's curated list, never replacing it. Every name here must be a lexicon the pack declares.",
+      "propertyNames": {
+        "$ref": "#/$defs/label"
+      },
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        }
+      }
     }
   },
   "$defs": {
@@ -236,7 +251,7 @@
           "additionalProperties": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 50000
+            "maximum": 1000000
           }
         },
         "date_window": {
@@ -257,12 +272,6 @@
             }
           }
         },
-        "doc_mix": {
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/$defs/decimalString"
-          }
-        },
         "special_rate": {
           "$ref": "#/$defs/decimalString"
         },
@@ -277,11 +286,8 @@
           "enum": [
             "safe",
             "validator"
-          ]
-        },
-        "emit_child_outside_window": {
-          "type": "boolean",
-          "description": "When false, a child record whose derived date falls outside the recipe's window is not emitted. Declared explicitly because it changes record counts by large factors."
+          ],
+          "description": "The policy this recipe is minted under. Binding: a mint that asks for a different one is refused. Absent means the caller chooses, defaulting to safe."
         }
       }
     },

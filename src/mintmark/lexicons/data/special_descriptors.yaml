@@ -21,6 +21,14 @@ labels:
     - doğum öncesi izin
     - iş kazası sonrası rapor
     - sevk belgesi
+    - kontrol izni
+    - rapor uzatma talebi
+    - iş göremezlik bildirimi
+    - engel durumu beyanı
+    - refakat izni
+    - periyodik muayene kaydı
+    - sağlık kurulu belgesi
+    - gebelik izni bildirimi
   RELIGION:
     note: Observance and accommodation, not belief content.
     values:
@@ -30,6 +38,12 @@ labels:
     - dini gün izni
     - oruç dönemi mesai talebi
     - cenaze töreni izni
+    - ibadethane ziyareti izni
+    - dini nikah kaydı
+    - beslenme tercihi beyanı
+    - dini tatil talebi
+    - inanç temelli mazeret bildirimi
+    - ibadet alanı talebi
   ETHNICITY:
     note: Declared origin and language preference, as an HR or claims form would record them.
     values:
@@ -38,6 +52,13 @@ labels:
     - iki dilli iletişim talebi
     - tercüman talebi
     - yerel dil desteği
+    - köken beyanı formu
+    - azınlık dili desteği talebi
+    - yazışma dili tercihi
+    - kültürel uyum notu
+    - isim yazımı düzeltme talebi
+    - çeviri desteği kaydı
+    - ana dilde bilgilendirme talebi
   POLITICAL:
     note: Fictional parties and civic bodies. No real party is ever named.
     values:
@@ -47,6 +68,12 @@ labels:
     - Kent Konseyi üyeliği
     - Yerel Meclis adaylığı
     - Şehir Platformu
+    - Semt Meclisi üyeliği
+    - Mahalle Girişimi kaydı
+    - Ortak Zemin Derneği üyeliği
+    - Kent Gönüllüleri kaydı
+    - Yerel Kalkınma Platformu üyeliği
+    - Sivil Katılım Ağı kaydı
   SEXUAL_LIFE:
     note: Form-level references only. Never narrative, never detail.
     values:
@@ -54,6 +81,14 @@ labels:
     - medeni hâl güncellemesi
     - aile durumu bildirimi
     - eş bilgisi güncellemesi
+    - birlikte yaşanan kişi beyanı
+    - hayat arkadaşı bildirimi
+    - nikah durumu kaydı
+    - aile birleşimi talebi
+    - eş sağlık kapsamı talebi
+    - boşanma durumu güncellemesi
+    - birliktelik beyanı formu
+    - aile içi durum bildirimi
   CRIMINAL:
     note: Check categories, never findings. 'A record was requested' is a process step; 'a record
       exists' would be an accusation about a person, and this project does not make those even
@@ -64,6 +99,13 @@ labels:
     - güvenlik soruşturması
     - sicil belgesi talebi
     - arşiv kaydı sorgulaması
+    - sicil belgesi ibrazı
+    - arşiv araştırması talebi
+    - kayıt sorgulama formu
+    - belge yenileme sorgusu
+    - sicil doğrulama talebi
+    - kayıt teyidi istemi
+    - belge geçerlilik sorgusu
   BIOMETRIC_REF:
     note: References to biometric systems, not to biometric data itself.
     values:
@@ -73,6 +115,12 @@ labels:
     - avuç içi okuyucu kaydı
     - parmak izi doğrulama hatası
     - biyometrik kayıt güncellemesi
+    - kart yerine parmak izi tercihi
+    - biyometrik veri silme talebi
+    - yüz tanıma kaydı yenileme
+    - avuç içi kaydı iptali
+    - biyometrik sistem devre dışı talebi
+    - parmak izi kaydı silme istemi
   UNION:
     note: Fictional unions. No real union is ever named.
     values:
@@ -82,22 +130,17 @@ labels:
     - Ortak Güç Sendikası
     - Meridyen İşçi Sendikası
     - Anka Çalışanlar Sendikası
+    - Meridyen Büro Sendikası
+    - Toros Hizmet Sendikası
+    - Kıyı İşçileri Sendikası
+    - Yeşil Yaka Sendikası
+    - Ortak Emek Birliği
+    - Pusula Çalışanlar Sendikası
   PERSON:
-    note: Counterparty and third-party names for document surfaces. Drawn from the same common
-      Turkish name pool as the structured fields.
-    values:
-    - Mehmet Demir
-    - Ayşe Kaya
-    - Ali Yıldız
-    - Zeynep Şahin
-    - Mustafa Çelik
-    - Elif Aydın
-    - Hasan Yılmaz
-    - Fatma Özdemir
-    - Emre Arslan
-    - Merve Doğan
-    - Kemal Kılıç
-    - Selin Aslan
+    note: Counterparty and third-party names for document surfaces. Composed from the same common
+      Turkish name pools the structured fields draw from, rather than listed, because a fixed list
+      of twelve names is a vocabulary an evaluation set can be passed by memorizing.
+    compose: [given_names_tr, surnames_tr]
   ORG:
     note: Fictional organizations on the place-and-nature pattern the family uses. Every entry
       passes the real-institution denylist scan.
@@ -114,6 +157,14 @@ labels:
     - Çınar Sağlık Hizmetleri
     - Marmara Tekstil
     - Ilgaz Makine
+    - Bereketli Tarım
+    - Kervan Nakliyat
+    - Yamaç Metal
+    - Adalı Denizcilik
+    - Poyraz Elektrik
+    - Sultanbey Mobilya
+    - Gökkuşağı Matbaa
+    - Yörük Tekstil
   ADDRESS:
     note: Address fragments for document surfaces. Invented, not drawn from any real address register.
     values:
@@ -125,6 +176,14 @@ labels:
     - Barbaros Bulvarı
     - Gültepe Mahallesi
     - Lale Sokak
+    - Fidanlık Mahallesi
+    - Karanfil Sokak
+    - Bahçelievler Mahallesi
+    - Ihlamur Caddesi
+    - Sakarya Sokak
+    - Yenidoğan Mahallesi
+    - Dere Sokak
+    - Kavaklık Caddesi
   DOB:
     note: Dates of birth as they appear inside prose rather than in a date field.
     values:

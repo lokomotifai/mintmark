@@ -3,6 +3,7 @@
     {field:record.path}      a value from the current record graph
     {entity:LABEL}           a draw from the descriptor lexicon for LABEL
     {id:TYPE}                a draw from an identifier engine
+    {lex:name}               a draw from a named lexicon, carrying no label
     (a|b|c)                  uniform alternation
     [?0.3: optional text]    included with probability 0.3
     [?special: text]         included at the recipe's special_rate
@@ -67,6 +68,18 @@ class IdentifierSlot:
 
 
 @dataclass(frozen=True, slots=True)
+class LexiconSlot:
+    """`{lex:perils_tr}`, drawn from a lexicon and emitted without a label.
+
+    Domain vocabulary is not personal data, so it carries no span. It exists so
+    that a template can vary its ordinary words instead of repeating one carrier
+    sentence, which is what makes a document set worth evaluating against.
+    """
+
+    name: str
+
+
+@dataclass(frozen=True, slots=True)
 class Alternation:
     """`(a|b|c)`, uniform over its branches."""
 
@@ -96,9 +109,9 @@ class Optional:
         return self.rate == SPECIAL_RATE
 
 
-Node = Literal | FieldSlot | EntitySlot | IdentifierSlot | Alternation | Optional
+Node = Literal | FieldSlot | EntitySlot | IdentifierSlot | LexiconSlot | Alternation | Optional
 
-_SLOT_KINDS = frozenset({"field", "entity", "id"})
+_SLOT_KINDS = frozenset({"field", "entity", "id", "lex"})
 MAX_TEMPLATE_CHARS = 65_536
 MAX_TEMPLATE_DEPTH = 64
 MAX_PROBABILITY_DECIMAL_PLACES = 19
@@ -110,6 +123,7 @@ def parse_template(
     template_id: str,
     known_labels: frozenset[str],
     known_identifiers: frozenset[str],
+    known_lexicons: frozenset[str] = frozenset(),
 ) -> tuple[Node, ...]:
     """Compile a template into nodes, failing closed on anything malformed."""
     if len(text) > MAX_TEMPLATE_CHARS:
@@ -125,6 +139,7 @@ def parse_template(
         template_id=template_id,
         known_labels=known_labels,
         known_identifiers=known_identifiers,
+        known_lexicons=known_lexicons,
         terminators="",
         depth=0,
     )
@@ -140,6 +155,7 @@ def _parse_sequence(
     template_id: str,
     known_labels: frozenset[str],
     known_identifiers: frozenset[str],
+    known_lexicons: frozenset[str],
     terminators: str,
     depth: int,
 ) -> tuple[tuple[Node, ...], int]:
@@ -177,7 +193,7 @@ def _parse_sequence(
         if character == "{":
             flush()
             node, position = _parse_slot(
-                text, position, template_id, known_labels, known_identifiers
+                text, position, template_id, known_labels, known_identifiers, known_lexicons
             )
             nodes.append(node)
             continue
@@ -185,7 +201,7 @@ def _parse_sequence(
         if character == "(":
             flush()
             node, position = _parse_alternation(
-                text, position, template_id, known_labels, known_identifiers, depth
+                text, position, template_id, known_labels, known_identifiers, known_lexicons, depth
             )
             nodes.append(node)
             continue
@@ -193,7 +209,7 @@ def _parse_sequence(
         if character == "[":
             flush()
             node, position = _parse_optional(
-                text, position, template_id, known_labels, known_identifiers, depth
+                text, position, template_id, known_labels, known_identifiers, known_lexicons, depth
             )
             nodes.append(node)
             continue
@@ -216,6 +232,7 @@ def _parse_slot(
     template_id: str,
     known_labels: frozenset[str],
     known_identifiers: frozenset[str],
+    known_lexicons: frozenset[str],
 ) -> tuple[Node, int]:
     close = text.find("}", start)
     if close == -1:
@@ -255,6 +272,16 @@ def _parse_slot(
                 + ", ".join(sorted(known_labels)),
             )
         return EntitySlot(label=argument), close + 1
+    if kind == "lex":
+        if known_lexicons and argument not in known_lexicons:
+            raise TemplateError(
+                template_id,
+                start,
+                "unknown-lexicon",
+                f"{argument!r} is not a lexicon this pack or the core declares; allowed: "
+                + ", ".join(sorted(known_lexicons)),
+            )
+        return LexiconSlot(name=argument), close + 1
 
     if argument not in known_identifiers:
         raise TemplateError(
@@ -273,6 +300,7 @@ def _parse_alternation(
     template_id: str,
     known_labels: frozenset[str],
     known_identifiers: frozenset[str],
+    known_lexicons: frozenset[str],
     depth: int,
 ) -> tuple[Node, int]:
     branches: list[tuple[Node, ...]] = []
@@ -284,6 +312,7 @@ def _parse_alternation(
             template_id=template_id,
             known_labels=known_labels,
             known_identifiers=known_identifiers,
+            known_lexicons=known_lexicons,
             terminators="|)",
             depth=depth + 1,
         )
@@ -313,6 +342,7 @@ def _parse_optional(
     template_id: str,
     known_labels: frozenset[str],
     known_identifiers: frozenset[str],
+    known_lexicons: frozenset[str],
     depth: int,
 ) -> tuple[Node, int]:
     if not text.startswith("[?", start):
@@ -334,6 +364,7 @@ def _parse_optional(
         template_id=template_id,
         known_labels=known_labels,
         known_identifiers=known_identifiers,
+        known_lexicons=known_lexicons,
         terminators="]",
         depth=depth + 1,
     )

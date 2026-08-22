@@ -11,6 +11,122 @@ output for a fixed set of inputs. A change that alters emitted bytes for a fixed
 seed is a major version event even when no signature changed, because it breaks
 the reproducibility of every published manifest.
 
+## 0.2.0 - 2026-08-23
+
+A security and conformance review of the three sector packs found one defect
+repeated in seven places: a field parsed, validated against the schema, asserted
+by a test, and then read by nothing. Every item below closes one of those. Two of
+them move emitted bytes for a fixed seed, which this project calls a major
+version event, so the version moves rather than the golden files quietly.
+
+### Hardened against a hostile pack and a hostile dataset
+
+Fourteen commits landed before this release was cut and are recorded here rather
+than left to the git log, because each one changes what the engine refuses.
+
+- **Resource budgets on everything a pack declares.** Strict YAML parsing, pack
+  declarations, document templates, and numeric work factors all carry explicit
+  bounds now, so a pack cannot make the loader do unbounded work. Templates are
+  compiled once before any record is generated, and a nesting depth limit refuses
+  a template that recurses past what the parser supports.
+- **Sampler bounds are checked rather than assumed.** An unsupported bound is
+  refused instead of producing a draw nobody can reason about.
+- **Atomic staging writes are isolated**, and the pack digest streams its inputs
+  from a confined set of paths rather than reading whatever it is pointed at.
+- **Untrusted dataset file access is hardened.** `verify` reads a dataset through
+  a reader that bounds what it will open, and the whole verification body sits
+  behind a boundary that turns a hostile input into a report rather than a
+  traceback.
+- **Every claim in a manifest is re-derived rather than trusted.** Record counts,
+  distributions, entity coverage, the achieved counts and `met` flags on coverage
+  targets, and the fixed-contract text are all recomputed from the data and
+  compared.
+- **Safe output and annotation invariants are enforced at mint time**, including
+  the label a field may carry for its generator, so a pack cannot declare a
+  document field or an identifier field with a label that contradicts it.
+- **Pack compatibility is enforced deterministically.** `requires_core` is checked
+  against the running core on every load rather than only when a caller asks.
+- **CI and release trust boundaries are sealed**, and the pack layer keeps its
+  dependency boundaries.
+
+### Fixed, and it changes what a verifier reports
+
+- **`verify` reported zero checksum-valid identifiers in datasets where every
+  identifier was checksum-valid.** The sweep ran only under the safe policy while
+  the counter it fills was printed under both, in the rendered report and in the
+  `--json` payload. A validator-policy dataset therefore reported
+  `checksum_valid_identifiers: 0`, and a script gating on that number let through
+  exactly the datasets it was written to stop. The sweep now runs under both
+  policies. Under safe a hit is still a problem, because safe mode is the
+  product's safety claim; under validator the count is the expected outcome and
+  is recorded as a fact.
+
+- **A declared coverage target was recorded and never checked.** Every manifest
+  carried the target, the achieved count, and a `met` flag, and nothing read any
+  of them, so an evaluation set could ship without a whole label and still verify
+  clean. `verify` now fails on a missed target. A mint that overrode its record
+  counts is exempt: `packcheck` mini-mints twenty-five records against targets in
+  the hundreds, and a deliberately shrunken run is not a claim the recipe made.
+
+- **The validator warning claimed more than the engines deliver.** It said the
+  values belong to no real person, account, or institution. That holds for an
+  IBAN, a PAN, and an email address, each of which sits in a range nobody can
+  hold. A TCKN and a VKN have no such reserved range, so a checksum-valid one is
+  indistinguishable from an issued number. The fixed text now says which is
+  which.
+
+### Fixed, and it moves emitted bytes
+
+- **Template weights were ignored.** Every template entry carries a required
+  `weight`, the schema validates it as a decimal string, and the renderer picked
+  uniformly regardless. A set declared at 0.35, 0.25, 0.25, 0.15 emitted an even
+  quarter each. Selection now uses the same weighted draw the enum generators
+  use.
+
+- **A pack could not contribute entity surfaces.** `{entity:ORG}` drew from the
+  core's curated list and nothing else, so every pack in the family shared one
+  twelve-name organization vocabulary, and an evaluation set built on it could be
+  passed by memorizing them. `pack.yaml` gains an optional `entity_lexicons` map
+  from label to the pack's own lexicons. The core list stays the floor: pack
+  surfaces are appended, never substituted.
+
+- **PERSON surfaces were a list of twelve full names.** The descriptor note
+  already said they came from the same common Turkish name pool the structured
+  fields draw from, so they are now composed from it: 60 given names against 50
+  surnames, 3000 surfaces, in a fixed order so the draw stays a plain index. A
+  label entry in the descriptor file may declare `compose` instead of `values`.
+
+### Added
+
+- **`{lex:name}` in the template grammar.** A draw from a named lexicon, emitted
+  without a label, so a template can vary its ordinary words instead of repeating
+  one carrier sentence. Domain vocabulary is not personal data and carries no
+  span.
+
+- **Two reachability rules on pack loading.** A lexicon nothing draws from, and a
+  template set no field renders, are refused by name. Three sector packs shipped
+  eight lexicons between them that reached no generator at all: source-noted,
+  denylist-tested, guarded by their own tests, and absent from every byte those
+  packs emit.
+
+### Changed
+
+- **A recipe that names an identifier policy now decides it.** The field was
+  parsed into the `Recipe` dataclass and read nowhere, so a recipe pinned to
+  `safe` minted checksum-valid identifiers the moment a caller passed
+  `--identifier-policy validator`. Naming a different policy than the recipe
+  names is refused. Naming the same one is allowed, because `reproduce` replays
+  what a manifest recorded and cannot know which of the two decided it.
+  `--identifier-policy` now defaults to unset rather than to `safe`.
+
+### Removed
+
+- **`doc_mix` and `emit_child_outside_window` from the recipe schema.**
+  `doc_mix` restated what the record counts already fix, and nothing read it;
+  `emit_child_outside_window` carried a schema description of behaviour no code
+  implemented. The template-set existence check `doc_mix` provided is replaced by
+  the stronger reachability rule above.
+
 ## 0.1.3 - 2026-08-22
 
 ### Fixed, and it changes every manifest

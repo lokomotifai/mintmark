@@ -13,9 +13,9 @@
 
 <p align="center">
   <a href="https://github.com/lokomotifai/mintmark/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/lokomotifai/mintmark/ci.yml?branch=main&amp;style=flat-square&amp;label=CI"></a>
-  <img alt="890 test" src="https://img.shields.io/badge/test-890-3C873A?style=flat-square">
+  <img alt="905 test" src="https://img.shields.io/badge/test-905-3C873A?style=flat-square">
   <img alt="18 invariant, her biri adlandırılmış testle" src="https://img.shields.io/badge/invariant-18%20test%20edildi-3C873A?style=flat-square">
-  <a href="https://github.com/lokomotifai/mintmark/releases/tag/v0.1.3"><img alt="Sürüm v0.1.3" src="https://img.shields.io/badge/sürüm-v0.1.3-3C873A?style=flat-square"></a>
+  <a href="https://github.com/lokomotifai/mintmark/releases/tag/v0.2.0"><img alt="Sürüm v0.2.0" src="https://img.shields.io/badge/sürüm-v0.2.0-3C873A?style=flat-square"></a>
   <a href="https://pypi.org/project/mintmark/"><img alt="PyPI'de" src="https://img.shields.io/pypi/v/mintmark?style=flat-square&amp;label=PyPI&amp;color=3C873A"></a>
   <a href="LICENSE"><img alt="Apache-2.0 lisansı" src="https://img.shields.io/badge/lisans-Apache--2.0-3B3F46?style=flat-square"></a>
 </p>
@@ -116,8 +116,9 @@ manifest schema: valid
 checksums: 3/3 match
 identifier policy: safe (confirmed)
 checksum-valid identifiers found: 0
+coverage targets: 0 checked
 taxonomy: hushmark-tr v0.1, pin af11b31e4916
-label alignment: 100 documents, 81 spans
+label alignment: 100 documents, 89 spans
 dataset license: CC-BY-4.0
 attribution: mintmark-example 0.1.0 reference dataset (recipe demo, seed 42), lokomotifai, licensed CC-BY-4.0
 authenticity: self-consistency only; no trusted manifest digest supplied

@@ -11,10 +11,6 @@ records:
 date_window:
   start: "2026-01-01T00:00:00+00:00"
   end: "2026-12-31T23:59:59+00:00"
-doc_mix:
-  complaints: "0.4"
-  kyc_notes: "0.3"
-  transcripts: "0.3"
 special_rate: "1"
 coverage_targets:
   PERSON: 20
@@ -24,4 +20,3 @@ coverage_targets:
   VKN: 10
   PAN: 10
 identifier_policy: safe
-emit_child_outside_window: false

@@ -50,7 +50,7 @@ from mintmark.manifest.sums import SUMS_FILENAME, parse_sums
 
 Validator = Callable[[str], bool]
 MAX_SCHEMA_PROBLEMS = 100
-MAX_RECORDS_PER_OUTPUT = 100_000
+MAX_RECORDS_PER_OUTPUT = 1_000_000  # matches MAX_RECORDS_PER_TYPE in packs.model
 MAX_RECORD_CHARS = 1 << 20
 MAX_SPANS_PER_DOCUMENT = 4096
 
@@ -65,6 +65,8 @@ class VerifyReport:
     checksums_matched: int = 0
     identifier_policy: str = "unknown"
     checksum_valid_identifiers: int = 0
+    coverage_checked: bool = False
+    coverage_targets_checked: int = 0
     documents_checked: int = 0
     spans_checked: int = 0
     taxonomy_pin: str = ""
@@ -86,6 +88,8 @@ class VerifyReport:
             "checksums": {"checked": self.checksums_checked, "matched": self.checksums_matched},
             "identifier_policy": self.identifier_policy,
             "checksum_valid_identifiers": self.checksum_valid_identifiers,
+            "coverage_checked": self.coverage_checked,
+            "coverage_targets_checked": self.coverage_targets_checked,
             "documents_checked": self.documents_checked,
             "spans_checked": self.spans_checked,
             "taxonomy_pin": self.taxonomy_pin,
@@ -103,7 +107,15 @@ class VerifyReport:
             f"identifier policy: {self.identifier_policy} (confirmed)"
             if self.identifier_policy != "unknown"
             else "identifier policy: unknown",
-            f"checksum-valid identifiers found: {self.checksum_valid_identifiers}",
+            f"checksum-valid identifiers found: {self.checksum_valid_identifiers}"
+            + (
+                " (expected under the validator policy)"
+                if self.identifier_policy == "validator"
+                else ""
+            ),
+            f"coverage targets: {self.coverage_targets_checked} checked"
+            if self.coverage_checked
+            else "coverage targets: not checked, this mint overrode its record counts",
             f"taxonomy: {self.taxonomy_pin}",
             f"label alignment: {self.documents_checked} documents, {self.spans_checked} spans",
             f"dataset license: {self.dataset_license}",
@@ -213,8 +225,14 @@ def verify(
                 known_labels=known_labels,
             )
             _check_manifest_claims(document, records, label_counts, report, known_labels)
-            if report.identifier_policy == "safe":
-                _sweep_identifiers(records, validators, report)
+            _check_coverage(document, report)
+            # The sweep runs under both policies. It used to run only under `safe`
+            # while the counter it fills was reported either way, so a validator
+            # dataset in which every identifier passes its checksum was reported
+            # as carrying none of them, in the rendered report and in the --json
+            # payload alike. A script gating on that number let through exactly
+            # the datasets it was written to stop.
+            _sweep_identifiers(records, validators, report)
         except Exception as exc:  # verifier boundary: hostile input must become a report
             report.problems.append(f"verification aborted safely: {type(exc).__name__}: {exc}")
 
@@ -256,6 +274,33 @@ def _check_validator_warning(document: dict[str, Any], report: VerifyReport) -> 
             report.problems.append("validator_warning has been altered from the fixed text")
     elif present:
         report.problems.append("validator_warning present under a safe policy")
+
+
+def _check_coverage(document: dict[str, Any], report: VerifyReport) -> None:
+    """A declared coverage target that was missed is a verification failure.
+
+    The target, the achieved count, and a `met` flag were already written into
+    every manifest, and the only thing reading them checked that the flag was
+    honest, not that the target was reached. So an evaluation set could ship
+    without a whole label and still verify clean.
+
+    The one exemption is a mint whose record counts were overridden: `packcheck`
+    mini-mints twenty-five records against targets in the hundreds, and a
+    deliberately shrunken run is not a claim the recipe made.
+    """
+    overrides = document["recipe"]["parameters"].get("overrides", {})
+    if "records" in overrides:
+        report.coverage_checked = False
+        return
+    report.coverage_checked = True
+    for stat in document["stats"].get("coverage_targets", []):
+        report.coverage_targets_checked += 1
+        if stat["achieved"] < stat["target"]:
+            report.problems.append(
+                f"coverage target {stat['label']}={stat['target']} was not met: "
+                f"{stat['achieved']} span(s) emitted. An evaluation set short of a "
+                "label measures nothing about that label."
+            )
 
 
 def _check_checksums(reader: DatasetReader, document: dict[str, Any], report: VerifyReport) -> None:
@@ -725,8 +770,9 @@ def _sweep_identifiers(
                 for validator_name, validator in validators.items():
                     if validator(candidate):
                         report.checksum_valid_identifiers += 1
-                        report.problems.append(
-                            f"{name} line {number}: contains a checksum-valid "
-                            f"{validator_name} under a safe policy; safe mode is the "
-                            "product's safety claim"
-                        )
+                        if report.identifier_policy == "safe":
+                            report.problems.append(
+                                f"{name} line {number}: contains a checksum-valid "
+                                f"{validator_name} under a safe policy; safe mode is the "
+                                "product's safety claim"
+                            )

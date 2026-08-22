@@ -40,7 +40,13 @@ from mintmark.annotate import (
     write_sidecar,
 )
 from mintmark.emit import csv_header, render_csv_row, render_record, staged_output
-from mintmark.engine.draws import boolean, bounded, bounded_range, datetime_in_window
+from mintmark.engine.draws import (
+    boolean,
+    bounded,
+    bounded_range,
+    datetime_in_window,
+    weighted_index,
+)
 from mintmark.engine.prng import SplitMix64
 from mintmark.engine.records import (
     DistributionTally,
@@ -165,6 +171,37 @@ class MintError(RuntimeError):
     """A mint cannot proceed. Distinct from a malformed pack, which exits 2."""
 
 
+def _resolve_policy(requested: str | None, recipe: Recipe, pack: Pack) -> IdentifierPolicy:
+    """Settle the identifier policy between the caller, the recipe, and the pack.
+
+    A recipe that names a policy is binding. It used to be advisory in the worst
+    way: parsed, schema-checked, asserted by every pack's own test suite, and read
+    by nothing, so a recipe pinned to `safe` minted checksum-valid identifiers the
+    moment a caller passed the flag. A declaration that a reader takes for a
+    control has to be one.
+
+    The caller may still name the same policy, because `reproduce` replays what a
+    manifest recorded and a script should not have to know which of the two
+    decided it. Naming a different one is refused rather than silently ranked.
+    """
+    if (
+        requested is not None
+        and recipe.identifier_policy is not None
+        and requested != recipe.identifier_policy
+    ):
+        raise MintError(
+            f"recipe {recipe.name!r} is minted under the "
+            f"{recipe.identifier_policy!r} identifier policy and asked for "
+            f"{requested!r}. The recipe decides; drop the flag, or change the recipe."
+        )
+    effective = requested if requested is not None else (recipe.identifier_policy or "safe")
+    policy = parse_policy(effective)
+    if policy.value not in pack.allowed_identifier_policies:
+        allowed = ", ".join(pack.allowed_identifier_policies)
+        raise MintError(f"this pack allows identifier policies [{allowed}], not {policy.value!r}")
+    return policy
+
+
 def attribution_line(pack: Pack, recipe: str, seed: int) -> str:
     """The credit line a consumer reproduces to satisfy the dataset license.
 
@@ -186,7 +223,7 @@ def mint(
     recipe: str,
     seed: int,
     out: str | Path,
-    identifier_policy: str = "safe",
+    identifier_policy: str | None = None,
     fmt: str = "jsonl",
     records: dict[str, int] | None = None,
     invocation: str = "mintmark mint",
@@ -194,14 +231,10 @@ def mint(
     """Mint one dataset. Byte-identical for identical inputs."""
     pack_root = Path(pack)
     target = Path(out)
-    policy = parse_policy(identifier_policy)
 
     loaded = load_pack(pack_root)
-    if policy.value not in loaded.allowed_identifier_policies:
-        allowed = ", ".join(loaded.allowed_identifier_policies)
-        raise MintError(f"this pack allows identifier policies [{allowed}], not {policy.value!r}")
-
     declared = loaded.recipe(recipe)
+    policy = _resolve_policy(identifier_policy, declared, loaded)
     counts = dict(declared.records)
     overrides: dict[str, Any] = {}
     if records:
@@ -267,7 +300,9 @@ class _MintContext:
     tallies: dict[str, DistributionTally] = dataclass_field(default_factory=dict)
     coverage: dict[str, int] = dataclass_field(default_factory=dict)
     _tables: dict[str, Table] = dataclass_field(default_factory=dict)
-    _templates: dict[str, tuple[tuple[Node, ...], ...]] = dataclass_field(default_factory=dict)
+    _templates: dict[str, tuple[tuple[tuple[Node, ...], ...], tuple[str, ...]]] = dataclass_field(
+        default_factory=dict
+    )
 
     def compile_templates(self) -> None:
         """Compile every declared template before any records are generated."""
@@ -276,7 +311,8 @@ class _MintContext:
         for record_type in self.pack.record_types:
             allowed = {f"{record_type.type_name}.{field.name}" for field in record_type.fields}
             for document_field in record_type.document_fields:
-                for entry in self._templates[document_field.generator_argument]:
+                parsed, _ = self._templates[document_field.generator_argument]
+                for entry in parsed:
                     for path in _field_slot_paths(entry):
                         if path not in allowed:
                             raise MintError(
@@ -289,17 +325,23 @@ class _MintContext:
             self._tables[name] = load_table(asset_dir("tables"), name)
         return self._tables[name]
 
-    def templates(self, set_name: str) -> tuple[tuple[Node, ...], ...]:
+    def templates(self, set_name: str) -> tuple[tuple[tuple[Node, ...], ...], tuple[str, ...]]:
+        """Parsed templates and their declared weights, in declaration order."""
         if set_name not in self._templates:
             entries = self.pack.template_sets[set_name]
-            self._templates[set_name] = tuple(
-                parse_template(
-                    entry.text,
-                    template_id=entry.id,
-                    known_labels=KNOWN_LABELS,
-                    known_identifiers=KNOWN_IDENTIFIERS,
-                )
-                for entry in entries
+            known_lexicons = frozenset(self.pack.lexicons) | core_lexicon_names()
+            self._templates[set_name] = (
+                tuple(
+                    parse_template(
+                        entry.text,
+                        template_id=entry.id,
+                        known_labels=KNOWN_LABELS,
+                        known_identifiers=KNOWN_IDENTIFIERS,
+                        known_lexicons=known_lexicons,
+                    )
+                    for entry in entries
+                ),
+                tuple(entry.weight for entry in entries),
             )
         return self._templates[set_name]
 
@@ -408,8 +450,6 @@ class _MintContext:
                     targets=dict(zip(options, weights, strict=True)),
                 ),
             )
-            from mintmark.engine.draws import weighted_index
-
             value = options[weighted_index(stream, weights)]
             tally.observe(value)
             return value
@@ -525,9 +565,11 @@ class _MintContext:
     ) -> tuple[str, list[Span]]:
         doc_field = record_type.document_fields[0]
         set_name = doc_field.generator_argument
-        templates = self.templates(set_name)
+        parsed, weights = self.templates(set_name)
         stream = self.factory.stream(f"{record_type.type_name}/{index}/{doc_field.name}/pick")
-        nodes = templates[bounded(stream, len(templates))]
+        # Declared weights, not a uniform pick. A weight the engine ignores makes
+        # every template set an even mix whatever the pack wrote down.
+        nodes = parsed[weighted_index(stream, list(weights))]
 
         render_stream = self.factory.stream(
             f"{record_type.type_name}/{index}/{doc_field.name}/render"
@@ -542,6 +584,7 @@ class _MintContext:
             entity=lambda label, s: self._descriptor(label, s),
             identifier=lambda kind, s: self._identifier(kind, s, row),
             field_label=labels.get,
+            lexicon=lambda name, s: self._lexicon_surface(name, s),
         )
         return render(
             nodes,
@@ -551,7 +594,27 @@ class _MintContext:
         )
 
     def _descriptor(self, label: Label, stream: SplitMix64) -> str:
+        """A surface for an entity label: the core's list, plus the pack's own.
+
+        The core ships a curated surface list per label, and for a long time that
+        was the whole vocabulary: every pack in the family drew organizations from
+        the same twelve names, so an evaluation set could be passed by memorizing
+        them. A pack may now contribute its own, appended after the core's so that
+        the core list stays the floor rather than something a pack can replace.
+        """
         values = core_descriptors(label)
+        extra = self.pack.entity_lexicons.get(label.value, ())
+        if extra:
+            surfaces = list(values)
+            for name in extra:
+                surfaces.extend(self.lexicon_values(name))
+            values = surfaces
+        return values[bounded(stream, len(values))]
+
+    def _lexicon_surface(self, name: str, stream: SplitMix64) -> str:
+        values = self.lexicon_values(name)
+        if not values:
+            raise MintError(f"lexicon {name!r} is empty")
         return values[bounded(stream, len(values))]
 
 
@@ -592,6 +655,12 @@ def _assert_safe_records(generated: dict[str, list[Record]]) -> None:
 _CORE_LEXICON_CACHE: dict[str, list[str]] = {}
 
 
+def core_lexicon_names() -> frozenset[str]:
+    """Every lexicon the core ships, by name. The descriptor file is not one."""
+    directory = Path(__file__).resolve().parent / "lexicons" / "data"
+    return frozenset(p.stem for p in directory.glob("*.yaml") if p.stem != "special_descriptors")
+
+
 def core_lexicon(name: str) -> list[str]:
     """Load a lexicon the core ships, by name."""
     if name in _CORE_LEXICON_CACHE:
@@ -630,7 +699,16 @@ def _load_descriptors() -> dict[str, list[str]]:
     path = Path(__file__).resolve().parent / "lexicons" / "data" / "special_descriptors.yaml"
     document = yaml.safe_load(path.read_text(encoding="utf-8"))
     for label, entry in document["labels"].items():
-        _DESCRIPTOR_CACHE[label] = [str(v) for v in entry["values"]]
+        if "compose" in entry:
+            # A cross product of core lexicons, materialized in a fixed order so
+            # that the draw stays a plain index into a list like every other one.
+            pools = [core_lexicon(name) for name in entry["compose"]]
+            surfaces = [""]
+            for pool in pools:
+                surfaces = [f"{prefix} {value}".strip() for prefix in surfaces for value in pool]
+            _DESCRIPTOR_CACHE[label] = surfaces
+        else:
+            _DESCRIPTOR_CACHE[label] = [str(v) for v in entry["values"]]
     return _DESCRIPTOR_CACHE
 
 

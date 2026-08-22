@@ -24,6 +24,7 @@ from mintmark.engine.templates import (
     EntitySlot,
     FieldSlot,
     IdentifierSlot,
+    LexiconSlot,
     Literal,
     Node,
     Optional,
@@ -34,6 +35,17 @@ from mintmark.engine.templates import (
 
 class RenderError(ValueError):
     """A slot could not be resolved against the record graph at render time."""
+
+
+def _no_lexicon(name: str, stream: SplitMix64) -> str:
+    """The default lexicon resolver: refuse rather than render nothing.
+
+    A caller that renders a template carrying `{lex:...}` without supplying a
+    lexicon resolver has a wiring fault. Returning an empty surface would hide it
+    inside a document that still looks plausible.
+    """
+    del stream
+    raise RenderError(f"a template draws from lexicon {name!r}, but no lexicon resolver was given")
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,6 +63,7 @@ class Resolvers:
     entity: Callable[[Label, SplitMix64], str]
     identifier: Callable[[str, SplitMix64], str]
     field_label: Callable[[str], Label | None]
+    lexicon: Callable[[str, SplitMix64], str] = _no_lexicon
 
 
 def render(
@@ -106,6 +119,12 @@ def _emit(
                 if not surface:
                     raise RenderError(f"the lexicon for {label_name} produced an empty surface")
                 recorder.append_labeled(surface, label)
+
+            case LexiconSlot(name=lexicon_name):
+                surface = resolvers.lexicon(lexicon_name, stream)
+                if not surface:
+                    raise RenderError(f"lexicon {lexicon_name!r} produced an empty surface")
+                recorder.append(surface)
 
             case IdentifierSlot(identifier=identifier):
                 surface = resolvers.identifier(identifier, stream)
