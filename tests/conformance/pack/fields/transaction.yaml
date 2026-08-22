@@ -20,3 +20,11 @@ fields:
   - {name: mirror_amount, type: int, generator: "derived:copy_of", params: {source: amount_kurus}, pii_label: none}
   - {name: counterparty_iban, type: str, generator: "identifier:IBAN", nullable: true, null_rate: "0.35", pii_label: IBAN}
   - {name: vkn, type: str, generator: "identifier:VKN", pii_label: VKN}
+  - name: anomaly_kind
+    type: enum
+    generator: enum_weighted
+    params:
+      values: [none, burst, velocity]
+      weights: ["0.90", "0.06", "0.04"]
+    pii_label: none
+  - {name: is_anomaly, type: str, generator: "derived:flag_unless", params: {source: anomaly_kind, value: none}, pii_label: none}

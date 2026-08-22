@@ -454,6 +454,33 @@ def _validate_field(
             file_path, location, "ref-on-non-ref-field", f"type is {declared.type!r}, not ref"
         )
 
+    if "age_years" in declared.params:
+        # An age window only means something to the timestamp generator. Declared
+        # anywhere else it would be read by nothing, and a parameter that is
+        # silently ignored is worse than one that is rejected.
+        if declared.generator_kind != "datetime_window":
+            raise PackError(
+                file_path,
+                location,
+                "age-years-on-wrong-generator",
+                f"declares age_years but its generator is {declared.generator!r}; "
+                "only datetime_window reads it",
+            )
+        span = declared.params["age_years"]
+        if not isinstance(span, list) or len(span) != 2:
+            raise PackError(
+                file_path, location, "age-years-shape", "age_years is a list of two integers"
+            )
+        if not all(isinstance(bound, int) and not isinstance(bound, bool) for bound in span):
+            raise PackError(file_path, location, "age-years-shape", "age_years bounds are integers")
+        if not 0 <= span[0] < span[1]:
+            raise PackError(
+                file_path,
+                location,
+                "age-years-range",
+                f"age_years is {span!r}; the bounds run from zero upward and low is below high",
+            )
+
     if declared.generator_kind == "grammar":
         set_name = declared.generator_argument
         if set_name not in template_sets:

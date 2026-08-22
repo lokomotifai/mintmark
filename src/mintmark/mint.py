@@ -368,13 +368,45 @@ class _MintContext:
             return pan.mask(value)
         return str(value)
 
+    # A year of 365 days plus one leap day every four. The exact Gregorian rule
+    # would be more accurate over centuries and is not worth a float here: this
+    # positions a birth window, and being a day out at the edge of a forty-year
+    # span changes nothing a consumer can observe.
+    _DAYS_PER_YEAR = 365
+    _SECONDS_PER_DAY = 86_400
+
     def _timestamp(self, stream: SplitMix64, declared: Field) -> str:
-        window = self.recipe.date_window
-        seconds = datetime_in_window(stream, window.start_epoch, window.end_epoch)
+        start, end = self._field_window(declared)
+        seconds = datetime_in_window(stream, start, end)
         moment = datetime.fromtimestamp(seconds, tz=UTC) + timedelta(hours=3)
         if declared.type == "date":
             return moment.date().isoformat()
         return moment.replace(tzinfo=None).isoformat() + TURKEY_OFFSET
+
+    def _field_window(self, declared: Field) -> tuple[int, int]:
+        """The recipe window, unless the field asks to sit a whole age behind it.
+
+        A birth date drawn from the recipe window puts every person's year of
+        birth inside the year the records describe, which is visibly wrong on the
+        first line a reader opens. `age_years: [low, high]` moves the draw to the
+        span that would give a person that age at the start of the window.
+
+        The default is the recipe window unchanged, so a field that says nothing
+        keeps the behaviour every existing pack was built against.
+        """
+        window = self.recipe.date_window
+        span = declared.params.get("age_years")
+        if span is None:
+            return window.start_epoch, window.end_epoch
+        low, high = int(span[0]), int(span[1])
+        return (
+            window.start_epoch - self._age_seconds(high),
+            window.start_epoch - self._age_seconds(low),
+        )
+
+    def _age_seconds(self, years: int) -> int:
+        days = years * self._DAYS_PER_YEAR + years // 4
+        return days * self._SECONDS_PER_DAY
 
     def _derived(self, rule: str, declared: Field, stream: SplitMix64, row: Record) -> Any:
         if rule == "email_from_name":
@@ -385,6 +417,13 @@ class _MintContext:
                 last_name=str(row.get("last_name", "")),
                 subdomain=str(declared.params.get("subdomain") or "") or None,
             )
+        if rule == "flag_unless":
+            # Turns a sentinel enum value into a boolean, so a row can carry both
+            # "which anomaly" and "is it anomalous" without two independent draws
+            # that could disagree with each other.
+            source = row.get(str(declared.params.get("source", "")))
+            return source != declared.params.get("value")
+
         if rule == "copy_of":
             return row.get(str(declared.params.get("source", "")))
         if rule == "ratio_of":
@@ -425,7 +464,12 @@ class _MintContext:
             identifier=lambda kind, s: self._identifier(kind, s, row),
             field_label=labels.get,
         )
-        return render(nodes, stream=render_stream, resolvers=resolvers)
+        return render(
+            nodes,
+            stream=render_stream,
+            resolvers=resolvers,
+            special_rate=self.recipe.special_rate,
+        )
 
     def _descriptor(self, label: Label, stream: SplitMix64) -> str:
         values = core_descriptors(label)

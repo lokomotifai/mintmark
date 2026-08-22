@@ -308,3 +308,104 @@ def test_a_digit_run_inside_a_longer_token_is_not_a_candidate() -> None:
     assert _CANDIDATE.findall("ab1234567890cd") == []
     assert _CANDIDATE.findall("26bf03eefa2dec60a2033640190cf612") == []
     assert _CANDIDATE.findall("TR990000000000000000000001") == ["TR990000000000000000000001"]
+
+
+# A birth date that sits inside the window the records describe.
+
+
+def test_a_field_without_an_age_window_still_draws_from_the_recipe_window(minted: Path) -> None:
+    """Every pack built before `age_years` existed depends on this staying true."""
+    window_years = {"2026"}
+    for line in (minted / "customer.jsonl").read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        assert json.loads(line)["birth_date"][:4] in window_years
+
+
+def test_an_age_window_moves_the_draw_behind_the_recipe_window(tmp_path: Path) -> None:
+    """The defect this parameter exists to fix, asserted on emitted rows.
+
+    Without it a birth date is drawn from the recipe window, so everybody in a
+    dataset describing 2026 was born in 2026. That is wrong on the first line a
+    reader opens, and no other check in the suite would have caught it.
+    """
+    import shutil
+
+    import yaml
+
+    pack = tmp_path / "pack"
+    shutil.copytree(CONFORMANCE, pack)
+    path = pack / "fields" / "customer.yaml"
+    document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    for field in document["fields"]:
+        if field["name"] == "birth_date":
+            field["params"] = {"age_years": [18, 65]}
+    path.write_text(yaml.safe_dump(document, allow_unicode=True, sort_keys=False), encoding="utf-8")
+
+    out = tmp_path / "aged"
+    mint(pack=pack, recipe="full", seed=20260822, out=out, invocation="pytest")
+
+    years = [
+        int(json.loads(line)["birth_date"][:4])
+        for line in (out / "customer.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert years, "the fixture emitted no customers"
+    # The recipe window opens in 2026, so the ages are measured against it.
+    assert all(18 <= 2026 - year <= 65 for year in years), sorted(set(years))
+    assert len(set(years)) > 1, "an age window must still vary, not collapse to one year"
+
+
+def test_an_age_window_on_a_generator_that_cannot_read_it_is_rejected(tmp_path: Path) -> None:
+    """A parameter nothing reads is worse than one that fails loudly."""
+    import shutil
+
+    import yaml
+
+    from mintmark.packs.model import PackError, load_pack
+
+    pack = tmp_path / "pack"
+    shutil.copytree(CONFORMANCE, pack)
+    path = pack / "fields" / "customer.yaml"
+    document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    for field in document["fields"]:
+        if field["name"] == "first_name":
+            field["params"] = {"age_years": [18, 65]}
+    path.write_text(yaml.safe_dump(document, allow_unicode=True, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(PackError) as caught:
+        load_pack(pack)
+    assert caught.value.rule == "age-years-on-wrong-generator", caught.value.rule
+
+
+@pytest.mark.parametrize(
+    ("span", "rule"),
+    [
+        ([65, 18], "age-years-range"),
+        ([-1, 65], "age-years-range"),
+        ([18], "age-years-shape"),
+        (18, "age-years-shape"),
+        ([18, True], "age-years-shape"),
+    ],
+)
+def test_a_malformed_age_window_names_the_rule_it_broke(
+    tmp_path: Path, span: object, rule: str
+) -> None:
+    import shutil
+
+    import yaml
+
+    from mintmark.packs.model import PackError, load_pack
+
+    pack = tmp_path / f"pack-{rule}-{span}"
+    shutil.copytree(CONFORMANCE, pack)
+    path = pack / "fields" / "customer.yaml"
+    document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    for field in document["fields"]:
+        if field["name"] == "birth_date":
+            field["params"] = {"age_years": span}
+    path.write_text(yaml.safe_dump(document, allow_unicode=True, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(PackError) as caught:
+        load_pack(pack)
+    assert caught.value.rule == rule, caught.value.rule

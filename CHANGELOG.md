@@ -13,7 +13,34 @@ the reproducibility of every published manifest.
 
 ## Unreleased
 
+### Changed, and it moved emitted bytes
+
+- The special-category descriptor lexicons moved into a curated YAML file and
+  grew to 90 entries. Expanding a lexicon changes the draw for every subsequent
+  index, so emitted bytes moved for a fixed seed. **Under this project's own rule
+  that is a major version event.** It is harmless only because nothing has been
+  published: there is no manifest this breaks. The reason is recorded in
+  `tests/golden/demo-run/DIGESTS.json` beside the regenerated goldens.
+- `special_rate` now governs what it claimed to govern. A recipe declared it and
+  nothing read it, so template authors fixed the density with literal
+  probabilities and the recipe field was decoration. Templates now write
+  `[?special: ...]` and the rate comes from the recipe.
+
 ### Added
+
+- The `derived:flag_unless` rule, which turns a sentinel enum value into a
+  boolean so a row can carry both which anomaly it is and whether it is one,
+  without two independent draws that can disagree.
+- An optional `age_years: [low, high]` parameter on `datetime_window`, which
+  draws from the span that would give a person that age at the start of the
+  recipe window. Without it a birth date is drawn from the recipe window, so
+  every person in a dataset describing one year was also born in that year. The
+  field is a valid date, the label is right, the span aligns and the manifest
+  verifies, so nothing in the suite caught it; it is only wrong to a reader. The
+  parameter is optional and a field that omits it behaves exactly as before, so
+  no existing declaration had to move. Declaring it on a field whose generator
+  cannot read it is rejected by name at pack load, because a parameter nothing
+  reads is worse than one that fails loudly.
 
 - Deterministic generation engine: SplitMix64 over 64-bit modular arithmetic,
   per-site stream derivation, unbiased bounded and weighted draws, and

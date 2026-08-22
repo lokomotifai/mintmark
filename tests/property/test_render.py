@@ -197,3 +197,65 @@ def test_a_long_template_with_many_slots_keeps_every_span_aligned() -> None:
     for span in spans:
         assert span.extract(text), f"span {span} extracts nothing"
     assert spans == sorted(spans)
+
+
+# The recipe's special_rate, which the template defers to.
+
+
+def run_special(text: str, rate: str, seed: int = 42) -> tuple[str, list]:
+    nodes = parse_template(
+        text, template_id="t", known_labels=LABELS, known_identifiers=IDENTIFIERS
+    )
+    return render(nodes, stream=SplitMix64(seed), resolvers=resolvers(), special_rate=rate)
+
+
+def test_a_special_segment_is_absent_at_rate_zero() -> None:
+    for seed in range(40):
+        text, spans = run_special("Not[?special: , {entity:HEALTH} var].", "0", seed)
+        assert spans == []
+        assert text == "Not."
+
+
+def test_a_special_segment_is_always_present_at_rate_one() -> None:
+    for seed in range(40):
+        _, spans = run_special("Not[?special: , {entity:HEALTH} var].", "1", seed)
+        assert len(spans) == 1
+        assert spans[0].label is Label.HEALTH
+
+
+def test_the_recipe_rate_actually_governs_the_density() -> None:
+    """The point of the deferral: changing the recipe changes the data.
+
+    Before this existed, special_rate was a declared recipe field with no effect.
+    The templates decided the density and the recipe only appeared to, so a pack
+    author lowering the rate would have changed nothing at all.
+    """
+    hits = {
+        rate: sum(
+            1
+            for seed in range(400)
+            if run_special("Not[?special: , {entity:HEALTH} var].", rate, seed)[1]
+        )
+        for rate in ("0.05", "0.5", "0.95")
+    }
+    assert hits["0.05"] < hits["0.5"] < hits["0.95"]
+    assert hits["0.05"] < 60
+    assert hits["0.95"] > 340
+
+
+def test_a_literal_rate_still_overrides_nothing() -> None:
+    """A template that fixes its own probability keeps it, whatever the recipe says."""
+    always = [run_special("A[?1: B]", rate, seed=s)[0] for rate in ("0", "1") for s in range(5)]
+    assert set(always) == {"A B"}
+
+
+def test_the_default_rate_is_zero_rather_than_undeclared() -> None:
+    """A caller who forgets the rate gets no special content, not some of it."""
+    nodes = parse_template(
+        "Not[?special: , {entity:HEALTH} var].",
+        template_id="t",
+        known_labels=LABELS,
+        known_identifiers=IDENTIFIERS,
+    )
+    _, spans = render(nodes, stream=SplitMix64(1), resolvers=resolvers())
+    assert spans == []

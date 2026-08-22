@@ -29,7 +29,7 @@ PACK = REPO_ROOT / "tests" / "conformance" / "pack"
 # adding a generator kind without exercising it fails this test.
 SCHEMA = json.loads((REPO_ROOT / "schemas" / "pack.schema.json").read_text(encoding="utf-8"))
 FIELD_TYPES = set(SCHEMA["$defs"]["field"]["properties"]["type"]["enum"])
-DERIVED_RULES = {"email_from_name", "date_offset", "ratio_of", "copy_of"}
+DERIVED_RULES = {"email_from_name", "date_offset", "ratio_of", "copy_of", "flag_unless"}
 GENERATOR_KINDS = {
     "lexicon",
     "identifier",

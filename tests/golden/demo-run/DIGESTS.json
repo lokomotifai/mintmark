@@ -6,13 +6,17 @@
   "identifier_policy": "safe",
   "digests": {
     "customer.jsonl": "f968b01fcef05728dd86393d827f43e81d92548ecbab5ac015382cb4f807d2d5",
-    "transaction.jsonl": "050e2d4e38deb52bb8b83f8b259a39a0bd8f50256feeb17395a30a3f4689b6a1",
-    "transaction.labels.jsonl": "adac017f331f57e23ae9e2f13be9935e93b879d89b7ae5e65671b600bfdb9ca4"
+    "transaction.jsonl": "45b09305e645844ce4d3e9aab4bf0799814456c3dc9dd4d6d9d96940576b82c9",
+    "transaction.labels.jsonl": "8f461a6a707af968fd3b9c2c60ff9e34b9fe4d4627eb38b56a5aa2b677954bc2"
   },
   "regenerated": [
     {
       "date": "2026-08-22",
       "reason": "The special-category descriptor lexicons were expanded from a handful of hard-coded strings to 90 curated entries, because every sector pack's evaluation recipe draws at least 300 spans per label and a four-entry pool would meet that count while producing a dataset that repeats itself. Expanding a lexicon changes the draw for every subsequent index, so emitted bytes moved for a fixed seed. That is a major version event under this project's own rule. It is recorded rather than quietly refreshed, and it is only harmless here because nothing has been published: no manifest exists that this breaks."
+    },
+    {
+      "date": "2026-08-22",
+      "reason": "A fictional organization name was removed from the ORG descriptor lexicon after it turned out to be a real Turkish financial brand. Removing a lexicon entry changes the draw for every subsequent index, so emitted bytes moved for a fixed seed. Same rule as the previous entry: a major version event, harmless only because nothing is published."
     }
   ]
 }

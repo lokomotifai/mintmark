@@ -58,10 +58,16 @@ def render(
     *,
     stream: SplitMix64,
     resolvers: Resolvers,
+    special_rate: str = "0",
 ) -> tuple[str, list[Span]]:
-    """Render nodes into normalized text and its spans."""
+    """Render nodes into normalized text and its spans.
+
+    `special_rate` is the recipe's, and it governs every `[?special: ...]` segment
+    in the template. It defaults to zero so that a caller who forgets it gets no
+    special-category content rather than an undeclared amount of it.
+    """
     recorder = SpanRecorder()
-    _emit(nodes, stream=stream, resolvers=resolvers, recorder=recorder)
+    _emit(nodes, stream=stream, resolvers=resolvers, recorder=recorder, special_rate=special_rate)
     return recorder.finalize()
 
 
@@ -71,6 +77,7 @@ def _emit(
     stream: SplitMix64,
     resolvers: Resolvers,
     recorder: SpanRecorder,
+    special_rate: str,
 ) -> None:
     for node in nodes:
         match node:
@@ -110,8 +117,15 @@ def _emit(
                     stream=stream,
                     resolvers=resolvers,
                     recorder=recorder,
+                    special_rate=special_rate,
                 )
 
             case Optional():
-                if include_optional(stream, node):
-                    _emit(node.body, stream=stream, resolvers=resolvers, recorder=recorder)
+                if include_optional(stream, node, special_rate):
+                    _emit(
+                        node.body,
+                        stream=stream,
+                        resolvers=resolvers,
+                        recorder=recorder,
+                        special_rate=special_rate,
+                    )

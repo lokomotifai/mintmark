@@ -58,7 +58,7 @@
         "type": {"enum": ["str", "int", "decimal_str", "date", "datetime", "enum", "ref", "doc"]},
         "generator": {
           "type": "string",
-          "pattern": "^(lexicon:[a-z][a-z0-9_]*|identifier:(TCKN|VKN|IBAN|PAN|PHONE|EMAIL)|grammar:[a-z][a-z0-9_]*|int_uniform|int_lognormal_table:[a-z][a-z0-9_]*|enum_weighted|seq_id|datetime_window|derived:(email_from_name|date_offset|ratio_of|copy_of))$"
+          "pattern": "^(lexicon:[a-z][a-z0-9_]*|identifier:(TCKN|VKN|IBAN|PAN|PHONE|EMAIL)|grammar:[a-z][a-z0-9_]*|int_uniform|int_lognormal_table:[a-z][a-z0-9_]*|enum_weighted|seq_id|datetime_window|derived:(email_from_name|date_offset|ratio_of|copy_of|flag_unless))$"
         },
         "params": {"type": "object"},
         "ref": {

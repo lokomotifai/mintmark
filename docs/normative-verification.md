@@ -168,6 +168,43 @@ permanent UTC+3 in 2016. The fixed rendering is correct.
 wrong. The correct response is a proper zone-aware rendering and a major version
 bump, not a widened tolerance.
 
+## Turkish insurance companies, and a real brand that reached a fictional lexicon
+
+**Owning milestone:** the insurance pack's lexicon work. **Verified:**
+2026-08-22. **Drift risk:** real. **Wired into the cadence loop.**
+
+**What went wrong first.** The core denylist is built from the payment systems
+participant register, which lists banks. It cannot catch a collision with an
+insurer, and one was already sitting in the insurance pack's fictional lexicon:
+Bereket Sigorta, a real company incorporated in 1995 and acquired by the Turkish
+Wealth Fund in 2023.
+
+The name reached a fictional list because "bereket" is an ordinary Turkish word
+for abundance. That is the same property the denylist's generic-word rule exists
+to handle, but in the opposite direction: the rule stops an ordinary word from
+firing on ordinary prose, and nothing stopped an ordinary word from being chosen
+as an invented brand that happens to be taken.
+
+The root turned out to be in three lexicons across two packs and in the core's own
+organization descriptors. All of them were corrected, and the family was
+re-scanned against the widest list available.
+
+**Source.** A public compilation of Turkish insurance, reinsurance, and pension
+companies, retrieved 2026-08-22, cross-checked against individual company records
+for the entries that mattered.
+
+**A limitation of this verification, stated rather than papered over.** The
+Turkish insurance association publishes the authoritative member list, and its
+page renders client side; it could not be read programmatically. The list used
+here is a public compilation of 40 companies, which is not the same as the
+authoritative register. It is enough to have caught a real collision and it is
+not enough to prove there are none. The cadence workflow re-checks it, and a
+manual read of the association's own page belongs in the release checklist.
+
+**Outcome.** 110 denylist entries in the insurance pack: the core's banks plus 40
+insurers. Every fictional name in all three packs and in the core descriptors was
+scanned against it, and the family is clean.
+
 ## Still to verify
 
 These belong to milestones that have not run yet and are listed so that nobody

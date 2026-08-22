@@ -17,7 +17,7 @@
 {"doc_id":"TXN-00000016","text_sha256":"ecc26d06b26dec9ca1918725821206c392d79e42424ab240d4216c1c3f8104a0","spans":[{"start":0,"end":11,"label":"PERSON"}]}
 {"doc_id":"TXN-00000017","text_sha256":"923aa4023800d01d2bfedd77668f8877c9b5bc911e334fd8b95a63a35f2ed655","spans":[]}
 {"doc_id":"TXN-00000018","text_sha256":"4d09f1e46b43513a3135883dd04dac67d941a2badbc9577488df5239f5392a32","spans":[{"start":0,"end":10,"label":"PERSON"}]}
-{"doc_id":"TXN-00000019","text_sha256":"19ef99c6a918b6998bc17b862178574e283eaa8cc911c461701fbda3a54417cc","spans":[{"start":0,"end":12,"label":"ORG"}]}
+{"doc_id":"TXN-00000019","text_sha256":"b5537a0498f368dd0d6c33496059da747539b0fccd6dd024a3797f8afc51e3c4","spans":[{"start":0,"end":11,"label":"ORG"}]}
 {"doc_id":"TXN-00000020","text_sha256":"a233daa0c7ccc69084f52044833ae3f3ee36870706454322adae0a234e44588a","spans":[{"start":0,"end":26,"label":"IBAN"}]}
 {"doc_id":"TXN-00000021","text_sha256":"2eb2b3ec523ad292a6a6830c31fadb675f5e77abeca87fdedd40b746c2c0a489","spans":[{"start":0,"end":26,"label":"IBAN"}]}
 {"doc_id":"TXN-00000022","text_sha256":"cd6f13968a199c309eb2b39d2f3a416c733e227124685885fe6ee5b587f7dc28","spans":[{"start":0,"end":26,"label":"IBAN"}]}
@@ -50,7 +50,7 @@
 {"doc_id":"TXN-00000049","text_sha256":"7fea19eef68c22f4377dc6d1daa6d9c533baab6cd179bff8c2cbb190c3da6ca5","spans":[{"start":0,"end":26,"label":"IBAN"}]}
 {"doc_id":"TXN-00000050","text_sha256":"c6c9d17666fae47fc1812cd6fe95d1442d22854f7fcaaf40acc6e85b1b40f9ae","spans":[{"start":0,"end":12,"label":"PERSON"}]}
 {"doc_id":"TXN-00000051","text_sha256":"52117fc0db6e6e1241650d22fe0c7c6a19e67a12ff8aee0753b7a869560a1a1f","spans":[{"start":0,"end":23,"label":"ORG"}]}
-{"doc_id":"TXN-00000052","text_sha256":"a6860ce2e7b8aec6c484b2e250d206e0e722f5fca53058be39ea1f0bc7e862e4","spans":[{"start":0,"end":12,"label":"ORG"}]}
+{"doc_id":"TXN-00000052","text_sha256":"67db3899df5ed6a1929247e6e9265e0f332bb953d58b12a608ebd006731cacc1","spans":[{"start":0,"end":11,"label":"ORG"}]}
 {"doc_id":"TXN-00000053","text_sha256":"19a5f6fd2e38f35b41773f7ed7ddef0dd1d39e590f79d765ced536e02e750fbc","spans":[{"start":0,"end":26,"label":"IBAN"}]}
 {"doc_id":"TXN-00000054","text_sha256":"d965fde35f95fb95c6d031ae77bbb0d39826098ff2b24fc15b3fa9be348d5056","spans":[{"start":0,"end":13,"label":"ORG"}]}
 {"doc_id":"TXN-00000055","text_sha256":"93c7cfbad44236c4078776f2f50caadab283a1901ed2a2c8ac9cede8895775d7","spans":[{"start":0,"end":9,"label":"PERSON"}]}
@@ -71,7 +71,7 @@
 {"doc_id":"TXN-00000070","text_sha256":"8b2af879484ad72f25b98cda7aa2ca932652ff33a648cf74bab9cd23e77fbd48","spans":[{"start":0,"end":8,"label":"ORG"}]}
 {"doc_id":"TXN-00000071","text_sha256":"4300516f98243fd56c3fbaffe2f02360701c6dea6e22e41b58ea2ac0f5c038c0","spans":[{"start":0,"end":11,"label":"PERSON"}]}
 {"doc_id":"TXN-00000072","text_sha256":"b7622b9f40c072185a20786f3c7aca23f5739a08c3c870e4408d4777b638abca","spans":[{"start":0,"end":18,"label":"ORG"}]}
-{"doc_id":"TXN-00000073","text_sha256":"a6860ce2e7b8aec6c484b2e250d206e0e722f5fca53058be39ea1f0bc7e862e4","spans":[{"start":0,"end":12,"label":"ORG"}]}
+{"doc_id":"TXN-00000073","text_sha256":"67db3899df5ed6a1929247e6e9265e0f332bb953d58b12a608ebd006731cacc1","spans":[{"start":0,"end":11,"label":"ORG"}]}
 {"doc_id":"TXN-00000074","text_sha256":"22901f5d67de7f6b59b9641c2f63764de081882356db06253ceae2cdedc47d53","spans":[{"start":0,"end":9,"label":"PERSON"}]}
 {"doc_id":"TXN-00000075","text_sha256":"3f69a381ccb87c566da3b9588d541ec09b0ca9cf721903b69c5a629829cc5ab7","spans":[{"start":0,"end":26,"label":"IBAN"}]}
 {"doc_id":"TXN-00000076","text_sha256":"28b614b3146e3f1949fe039e97819d96180ff32d9b7f8cf3698b63cbc61b7c88","spans":[{"start":0,"end":26,"label":"IBAN"}]}

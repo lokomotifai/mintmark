@@ -5,6 +5,7 @@
     {id:TYPE}                a draw from an identifier engine
     (a|b|c)                  uniform alternation
     [?0.3: optional text]    included with probability 0.3
+    [?special: text]         included at the recipe's special_rate
     {{ and }}                literal braces
 
 Parsing happens when a pack loads, not when a document renders. A template with
@@ -72,12 +73,27 @@ class Alternation:
     branches: tuple[tuple[Node, ...], ...]
 
 
+# A rate of "special" defers to the recipe rather than fixing a number in the
+# template. Without it, a recipe's special_rate would be a declared field with no
+# effect: the templates would decide the density and the recipe would only appear
+# to. A pack author changing the rate would change nothing.
+SPECIAL_RATE = "special"
+
+
 @dataclass(frozen=True, slots=True)
 class Optional:
-    """`[?0.3: text]`, included with the declared probability."""
+    """`[?0.3: text]`, included with the declared probability.
+
+    The rate is either a decimal string or the literal `special`, which resolves
+    to the recipe's special_rate at render time.
+    """
 
     rate: str
     body: tuple[Node, ...]
+
+    @property
+    def defers_to_recipe(self) -> bool:
+        return self.rate == SPECIAL_RATE
 
 
 Node = Literal | FieldSlot | EntitySlot | IdentifierSlot | Alternation | Optional
@@ -306,6 +322,8 @@ def _parse_optional(
 
 
 def _validate_rate(template_id: str, position: int, rate: str) -> None:
+    if rate == SPECIAL_RATE:
+        return
     try:
         value = Decimal(rate)
     except InvalidOperation:
@@ -323,6 +341,6 @@ def choose_branch(stream: SplitMix64, node: Alternation) -> tuple[Node, ...]:
     return node.branches[bounded(stream, len(node.branches))]
 
 
-def include_optional(stream: SplitMix64, node: Optional) -> bool:
+def include_optional(stream: SplitMix64, node: Optional, special_rate: str = "0") -> bool:
     """Whether an optional segment is included on this draw."""
-    return boolean(stream, node.rate)
+    return boolean(stream, special_rate if node.defers_to_recipe else node.rate)
