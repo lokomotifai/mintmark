@@ -6,6 +6,7 @@ build-backend = "hatchling.build"
 name = "mintmark"
 version = "0.1.0.dev0"
 description = "Deterministic, fully synthetic, Turkish-first labeled datasets with a provenance manifest."
+readme = "README.md"
 requires-python = ">=3.12,<3.13"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]

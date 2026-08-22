@@ -1,0 +1,7 @@
+entries:
+  - id: complaint_person_org
+    weight: "0.5"
+    text: "Sayin {field:complaint_ticket.created_ts} tarihinde {entity:PERSON} ile {entity:ORG} arasindaki islem icin sikayet olusturuldu[?0.4: , adres {entity:ADDRESS}]."
+  - id: complaint_identifiers
+    weight: "0.5"
+    text: "(Hesap|Kart) sahibi {id:TCKN} numarali musteri, {id:IBAN} hesabina iliskin {id:PHONE} uzerinden basvurdu."

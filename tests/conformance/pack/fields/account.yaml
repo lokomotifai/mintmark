@@ -1,0 +1,20 @@
+schema_version: 1
+type_name: account
+id_prefix: ACC
+order: 2
+fields:
+  - {name: account_id, type: str, generator: seq_id, pii_label: none}
+  - name: customer_id
+    type: ref
+    generator: seq_id
+    ref: {parent: customer, counts: [1, 2, 3], weights: ["0.55", "0.30", "0.15"]}
+    pii_label: none
+  - {name: iban, type: str, generator: "identifier:IBAN", pii_label: IBAN}
+  - name: type
+    type: enum
+    generator: enum_weighted
+    params: {values: [vadesiz, vadeli, maas], weights: ["0.70", "0.20", "0.10"]}
+    pii_label: none
+  - {name: balance_kurus, type: int, generator: "int_lognormal_table:balances", pii_label: none}
+  - {name: opened_date, type: date, generator: datetime_window, pii_label: none}
+  - {name: opened_plus_year, type: date, generator: "derived:date_offset", params: {source: opened_date, days: 365}, pii_label: none}

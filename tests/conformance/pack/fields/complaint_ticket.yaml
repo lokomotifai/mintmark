@@ -1,0 +1,13 @@
+schema_version: 1
+type_name: complaint_ticket
+id_prefix: CMP
+order: 5
+fields:
+  - {name: complaint_ticket_id, type: str, generator: seq_id, pii_label: none}
+  - name: customer_id
+    type: ref
+    generator: seq_id
+    ref: {parent: customer, counts: [0, 1], weights: ["0.5", "0.5"]}
+    pii_label: none
+  - {name: created_ts, type: datetime, generator: datetime_window, pii_label: none}
+  - {name: body, type: doc, generator: "grammar:complaints", pii_label: none}

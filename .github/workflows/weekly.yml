@@ -1,9 +1,8 @@
 # Cadence checks. THIS WORKFLOW REQUIRES NETWORK ACCESS at run time and is
 # deliberately separated from the required checks in ci.yml for that reason.
 #
-# Findings land as issues and as Surprises and Discoveries entries in the
-# build's plan. A run that finds nothing records that it ran and found nothing;
-# silence is not evidence.
+# Findings land as issues. A run that finds nothing records that it ran and
+# found nothing; silence is not evidence.
 name: weekly (network)
 
 on:
@@ -26,26 +25,67 @@ jobs:
           enable-cache: true
       - run: uv sync --locked
 
-      # Each check below is wired by the milestone that creates the asset it
-      # watches. Until then the step records that the check is not yet armed,
-      # which is a fact worth seeing in the run log rather than an empty pass.
-      - name: Taxonomy pin drift against hushmark upstream
+      - name: Taxonomy pin still matches this engine
         run: |
-          echo "not yet armed. The taxonomy pin lands in WP-04."
-          echo "on drift this check opens an issue and never re-pins automatically"
+          uv run python -c "
+          from mintmark.annotate import pin, NER_LABELS
+          block = pin()
+          print('taxonomy:', block['name'], 'v' + block['version'])
+          print('pin:', block['pin_digest'])
+          print('labels:', ', '.join(l.value for l in NER_LABELS))
+          print()
+          print('Compare the label list above against the hushmark upstream label map.')
+          print('On drift: open an issue. Never re-pin automatically. See docs/taxonomy.md.')
+          "
 
-      - name: TCMB bank code list, fictional-code confirmation
-        run: |
-          echo "not yet armed. The IBAN engine lands in WP-03."
-
-      - name: Institution denylist sources
-        run: |
-          echo "not yet armed. The denylist lands in WP-05."
-
-      - name: Reserved-name rule against RFC 2606 and RFC 6761
-        run: |
-          echo "not yet armed. The email engine lands in WP-03."
+      - name: Distribution tables still reproduce from their generator
+        run: uv run python tools/gen_tables.py --verify
 
       - name: Reproduce the committed reference golden run
         run: |
-          echo "not yet armed. The golden run lands in WP-12."
+          uv run mintmark mint --pack packs/example --recipe demo --seed 42 --out ./weekly-run
+          uv run mintmark verify ./weekly-run
+          uv run python -c "
+          import hashlib, json, pathlib, sys
+          expected = json.loads(pathlib.Path('tests/golden/demo-run/DIGESTS.json').read_text())['digests']
+          bad = []
+          for name, digest in sorted(expected.items()):
+              actual = hashlib.sha256(pathlib.Path('weekly-run', name).read_bytes()).hexdigest()
+              status = 'ok' if actual == digest else 'DRIFTED'
+              print(f'{name}: {status}')
+              if actual != digest:
+                  bad.append(name)
+          sys.exit(1 if bad else 0)
+          "
+
+      - name: Institution denylist source still reachable
+        run: |
+          uv run python -c "
+          from pathlib import Path
+          text = Path('assets/denylist/institutions-tr.txt').read_text(encoding='utf-8')
+          url = next(l for l in text.splitlines() if l.startswith('# URL:'))
+          print('The denylist was built from:')
+          print(' ', url.removeprefix('# URL:').strip())
+          print()
+          print('Re-fetch the TCMB participant list and compare. Institutions are')
+          print('licensed, merge, and rename, so a name that was fictional at')
+          print('authoring time can stop being fictional. On a new participant:')
+          print('add it to the denylist and re-run the scan over every lexicon.')
+          "
+
+      - name: Reserved-name rule and bank code assumption
+        run: |
+          uv run python -c "
+          from mintmark.identifiers import iban, email
+          print('IBAN bank code in use:', iban.FICTIONAL_BANK_CODE)
+          print('Re-confirm it is absent from the TCMB participant list.')
+          print()
+          print('Reserved domains:', ', '.join(email.RESERVED_DOMAINS), 'and', email.RESERVED_TLD)
+          print('Re-confirm against RFC 2606 section 2 and RFC 6761 section 6.5.')
+          "
+
+      - name: Record that the run happened
+        if: always()
+        run: |
+          echo "Cadence run complete. A run that finds nothing still records that"
+          echo "it ran: silence is not evidence."

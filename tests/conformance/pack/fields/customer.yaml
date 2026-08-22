@@ -1,0 +1,20 @@
+schema_version: 1
+type_name: customer
+id_prefix: CUST
+order: 1
+fields:
+  - {name: customer_id, type: str, generator: seq_id, pii_label: none}
+  - {name: first_name, type: str, generator: "lexicon:given_names_tr", pii_label: PERSON}
+  - {name: last_name, type: str, generator: "lexicon:surnames_tr", pii_label: PERSON}
+  - {name: national_id, type: str, generator: "identifier:TCKN", pii_label: TCKN}
+  - {name: birth_date, type: date, generator: datetime_window, pii_label: DOB}
+  - {name: email, type: str, generator: "derived:email_from_name", pii_label: EMAIL}
+  - {name: phone, type: str, generator: "identifier:PHONE", pii_label: PHONE}
+  - {name: il, type: str, generator: "lexicon:provinces_tr", pii_label: ADDRESS}
+  - name: segment
+    type: enum
+    generator: enum_weighted
+    params: {values: [mass, affluent, private], weights: ["0.80", "0.15", "0.05"]}
+    pii_label: none
+  - {name: vehicle_year, type: int, generator: int_uniform, params: {low: 2005, high: 2026}, pii_label: none}
+  - {name: rating, type: decimal_str, generator: "lexicon:ratings", pii_label: none}

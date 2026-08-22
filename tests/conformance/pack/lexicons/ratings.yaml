@@ -1,0 +1,6 @@
+name: ratings
+source_note: >
+  Decimal-string ratings, exercising the decimal_str field type. Invented values,
+  no source. They are strings rather than numbers because a rate expressed as a
+  JSON float would put emitted bytes at the mercy of platform rounding.
+values: ["0.25", "0.50", "0.75", "1.00"]

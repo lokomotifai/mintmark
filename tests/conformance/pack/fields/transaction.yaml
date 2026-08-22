@@ -1,0 +1,22 @@
+schema_version: 1
+type_name: transaction
+id_prefix: TXN
+order: 4
+fields:
+  - {name: txn_id, type: str, generator: seq_id, pii_label: none}
+  - name: account_id
+    type: ref
+    generator: seq_id
+    ref: {parent: account, counts: [1, 2, 3, 4], weights: ["0.40", "0.30", "0.20", "0.10"]}
+    pii_label: none
+  - {name: ts, type: datetime, generator: datetime_window, pii_label: none}
+  - name: channel
+    type: enum
+    generator: enum_weighted
+    params: {values: [mobil, internet, pos, atm, sube], weights: ["0.52", "0.18", "0.15", "0.10", "0.05"]}
+    pii_label: none
+  - {name: amount_kurus, type: int, generator: "int_lognormal_table:txn_amounts", pii_label: none}
+  - {name: net_kurus, type: int, generator: "derived:ratio_of", params: {source: amount_kurus, numerator: 82, denominator: 100}, pii_label: none}
+  - {name: mirror_amount, type: int, generator: "derived:copy_of", params: {source: amount_kurus}, pii_label: none}
+  - {name: counterparty_iban, type: str, generator: "identifier:IBAN", nullable: true, null_rate: "0.35", pii_label: IBAN}
+  - {name: vkn, type: str, generator: "identifier:VKN", pii_label: VKN}

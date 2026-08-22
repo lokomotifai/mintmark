@@ -1,0 +1,7 @@
+entries:
+  - id: transcript_verification
+    weight: "0.5"
+    text: "Temsilci: Kimlik dogrulamasi icin {id:TCKN} son haneleri. Musteri: {entity:PERSON}. Temsilci: {id:PAN} kartiniz (aktif|pasif)."
+  - id: transcript_special
+    weight: "0.5"
+    text: "Musteri {entity:ETHNICITY} ve {entity:SEXUAL_LIFE} konusunda beyanda bulundu; {entity:CRIMINAL} ve {entity:BIOMETRIC_REF} kaydi soruldu. Dogum tarihi {entity:DOB}."

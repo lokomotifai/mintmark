@@ -1,0 +1,7 @@
+entries:
+  - id: kyc_corporate
+    weight: "0.5"
+    text: "Kurumsal musteri vergi numarasi {id:VKN} olarak dogrulandi[?0.5: , iletisim {id:EMAIL}]. Meslek beyani {entity:ORG}."
+  - id: kyc_special
+    weight: "0.5"
+    text: "Gorusmede {entity:HEALTH} ve {entity:UNION} bilgisi paylasildi; {entity:RELIGION} ve {entity:POLITICAL} notu dusuldu."

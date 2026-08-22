@@ -1,0 +1,27 @@
+schema_version: 1
+name: full
+records:
+  customer: 60
+  account: 90
+  card: 40
+  transaction: 120
+  complaint_ticket: 40
+  kyc_note: 40
+  support_transcript: 40
+date_window:
+  start: "2026-01-01T00:00:00+00:00"
+  end: "2026-12-31T23:59:59+00:00"
+doc_mix:
+  complaints: "0.4"
+  kyc_notes: "0.3"
+  transcripts: "0.3"
+special_rate: "1"
+coverage_targets:
+  PERSON: 20
+  ORG: 20
+  TCKN: 10
+  IBAN: 10
+  VKN: 10
+  PAN: 10
+identifier_policy: safe
+emit_child_outside_window: false
