@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from mintmark.packs.digest import canonical_lines, enumerate_files, pack_digest
+from mintmark.packs.digest import PackDigestError, canonical_lines, enumerate_files, pack_digest
 
 CONFORMANCE = Path(__file__).resolve().parents[1] / "conformance" / "pack"
 
@@ -197,3 +197,37 @@ def test_every_directory_the_loader_reads_is_inside_the_digest() -> None:
 
     assert "pack.yaml" in DECLARATIVE_FILES
     assert {"fields", "recipes", "templates", "lexicons"} <= DECLARATIVE_DIRECTORIES
+
+
+def test_digest_refuses_a_symlinked_declaration(pack: Path, tmp_path: Path) -> None:
+    outside = tmp_path / "outside.yaml"
+    outside.write_text("secret: value\n", encoding="utf-8")
+    link = pack / "fields" / "linked.yaml"
+    link.symlink_to(outside)
+
+    with pytest.raises(PackDigestError, match="symbolic link"):
+        pack_digest(pack)
+
+
+def test_digest_refuses_a_symlinked_declaration_directory(pack: Path, tmp_path: Path) -> None:
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "secret.yaml").write_text("secret: value\n", encoding="utf-8")
+    (pack / "templates").symlink_to(outside, target_is_directory=True)
+
+    with pytest.raises(PackDigestError, match="symbolic link"):
+        pack_digest(pack)
+
+
+def test_digest_streaming_enforces_the_file_budget(
+    pack: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import mintmark.packs.digest as digest_module
+
+    asset = pack / "assets" / "large.bin"
+    asset.parent.mkdir()
+    asset.write_bytes(b"x" * 9)
+    monkeypatch.setattr(digest_module, "MAX_PACK_FILE_BYTES", 8)
+
+    with pytest.raises(PackDigestError, match="maximum"):
+        pack_digest(pack)

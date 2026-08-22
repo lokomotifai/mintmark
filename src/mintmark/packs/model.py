@@ -32,7 +32,7 @@ from typing import Any
 import jsonschema
 
 from mintmark.engine.draws import TWO64
-from mintmark.packs.digest import pack_digest
+from mintmark.packs.digest import PackDigestError, pack_digest
 from mintmark.packs.loader import PackError, load_yaml
 from mintmark.packs.semver import CoreRange, parse_range
 
@@ -305,6 +305,10 @@ def load_pack(root: Path, *, core_version: str | None = None) -> Pack:
     root = Path(root)
     if not root.is_dir():
         raise PackError(root, "pack", "not-a-directory", "a pack must be a directory")
+    try:
+        initial_digest = pack_digest(root)
+    except (NotADirectoryError, PackDigestError) as exc:
+        raise PackError(root, "pack", "unsafe-pack-tree", str(exc)) from exc
 
     manifest_path = root / "pack.yaml"
     if not manifest_path.exists():
@@ -329,6 +333,18 @@ def load_pack(root: Path, *, core_version: str | None = None) -> Pack:
 
     _cross_validate(root, record_types, recipes, template_sets, lexicons)
 
+    try:
+        final_digest = pack_digest(root)
+    except (NotADirectoryError, PackDigestError) as exc:
+        raise PackError(root, "pack", "unsafe-pack-tree", str(exc)) from exc
+    if final_digest != initial_digest:
+        raise PackError(
+            root,
+            "pack",
+            "pack-changed-during-load",
+            "declarative files changed while the pack was being parsed",
+        )
+
     return Pack(
         root=root,
         name=manifest["name"],
@@ -343,7 +359,7 @@ def load_pack(root: Path, *, core_version: str | None = None) -> Pack:
         recipes=recipes,
         template_sets=template_sets,
         lexicons=lexicons,
-        digest=pack_digest(root),
+        digest=final_digest,
     )
 
 
