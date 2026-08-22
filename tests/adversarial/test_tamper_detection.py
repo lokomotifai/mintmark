@@ -86,6 +86,14 @@ def reseal_output(dataset: Path, output_name: str) -> None:
     (dataset / SUMS_FILENAME).write_text(render_sums(sums), encoding="utf-8")
 
 
+def reseal_manifest(dataset: Path) -> None:
+    manifest_path = dataset / MANIFEST_FILENAME
+    document = json.loads(manifest_path.read_text(encoding="utf-8"))
+    sums = {output["path"]: output["sha256"] for output in document["outputs"]}
+    sums[MANIFEST_FILENAME] = file_digest(manifest_path)
+    (dataset / SUMS_FILENAME).write_text(render_sums(sums), encoding="utf-8")
+
+
 def test_the_pristine_dataset_verifies(dataset: Path) -> None:
     """Otherwise every tamper below could be failing for the wrong reason."""
     assert main(["verify", str(dataset)]) == EXIT_OK
@@ -222,6 +230,79 @@ def test_duplicate_manifest_json_keys_fail_closed(dataset: Path) -> None:
 def test_oversized_manifest_fails_with_a_verification_result(dataset: Path) -> None:
     (dataset / MANIFEST_FILENAME).write_text(" " * ((4 << 20) + 1), encoding="utf-8")
     assert main(["verify", str(dataset)]) == EXIT_VERIFY_FAILED
+
+
+@pytest.mark.adversarial
+def test_dataset_reader_detects_a_second_file_version(dataset: Path) -> None:
+    from mintmark.manifest.io import DatasetIOError, DatasetReader
+
+    name = "customer.jsonl"
+    replacement = dataset / "replacement"
+    replacement.write_bytes((dataset / name).read_bytes())
+    with DatasetReader(dataset) as reader:
+        reader.digest(name)
+        replacement.replace(dataset / name)
+        with pytest.raises(DatasetIOError, match="different file version"):
+            reader.read_bytes(name, max_bytes=256 << 20)
+
+
+@pytest.mark.adversarial
+def test_duplicate_keys_in_data_records_are_rejected_after_resealing(dataset: Path) -> None:
+    from mintmark.api import verify
+
+    path = dataset / "customer.jsonl"
+    lines = path.read_text(encoding="utf-8").splitlines()
+    first = json.loads(lines[0])
+    key = next(iter(first))
+    lines[0] = lines[0][:-1] + f",{json.dumps(key)}:{json.dumps(first[key])}}}"
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    reseal_output(dataset, path.name)
+
+    report = verify(dataset)
+    assert not report.ok
+    assert any("duplicate object key" in problem for problem in report.problems)
+
+
+@pytest.mark.parametrize(
+    ("claim", "expected"),
+    [
+        ("output_records", "records claim"),
+        ("stats_records", "stats.record_counts"),
+        ("distribution", "fabricated achieved"),
+        ("coverage", "entity_coverage"),
+        ("attribution", "license.attribution"),
+        ("determinism", "determinism.claim"),
+    ],
+)
+@pytest.mark.adversarial
+def test_resealed_fabricated_manifest_claims_are_rederived(
+    dataset: Path, claim: str, expected: str
+) -> None:
+    from mintmark.api import verify
+
+    path = dataset / MANIFEST_FILENAME
+    document = json.loads(path.read_text(encoding="utf-8"))
+    if claim == "output_records":
+        document["outputs"][0]["records"] += 1
+    elif claim == "stats_records":
+        first = next(iter(document["stats"]["record_counts"]))
+        document["stats"]["record_counts"][first] += 1
+    elif claim == "distribution":
+        distribution = document["stats"]["distributions"][0]
+        distribution["achieved"] = dict.fromkeys(distribution["achieved"], "0")
+    elif claim == "coverage":
+        first = next(iter(document["entity_coverage"]))
+        document["entity_coverage"][first] += 1
+    elif claim == "attribution":
+        document["license"]["attribution"] = "fabricated attribution"
+    else:
+        document["determinism"]["claim"] = "all files are always identical"
+    path.write_text(json.dumps(document, ensure_ascii=False) + "\n", encoding="utf-8")
+    reseal_manifest(dataset)
+
+    report = verify(dataset)
+    assert not report.ok
+    assert any(expected in problem for problem in report.problems), report.problems
 
 
 @pytest.mark.adversarial
@@ -402,4 +483,17 @@ def test_reproduce_detects_a_changed_data_file(dataset: Path) -> None:
     # Checksums now agree with the altered file, so verify passes.
     assert main(["verify", str(dataset)]) == EXIT_OK
     # Reproduction re-derives the data and does not.
+    assert main(["reproduce", str(dataset)]) == EXIT_REPRODUCE_MISMATCH
+
+
+def test_reproduce_refuses_an_altered_sums_file(dataset: Path) -> None:
+    path = dataset / SUMS_FILENAME
+    lines = path.read_text(encoding="utf-8").splitlines()
+    lines[0] = "0" * 64 + "  " + lines[0].split("  ", 1)[1]
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    assert main(["reproduce", str(dataset)]) == EXIT_REPRODUCE_MISMATCH
+
+
+def test_reproduce_refuses_an_unlisted_extra_file(dataset: Path) -> None:
+    (dataset / "extra.jsonl").write_text("{}\n", encoding="utf-8")
     assert main(["reproduce", str(dataset)]) == EXIT_REPRODUCE_MISMATCH

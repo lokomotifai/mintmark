@@ -31,8 +31,20 @@ from typing import Any
 
 from mintmark.annotate import Label, pin_digest
 from mintmark.identifiers import CHECKSUMMED
-from mintmark.manifest import MANIFEST_FILENAME, read_manifest, verify
+from mintmark.manifest import (
+    MANIFEST_FILENAME,
+    SUMS_FILENAME,
+    read_manifest,
+    render_sums,
+    verify,
+)
 from mintmark.manifest.document import comparable
+from mintmark.manifest.io import (
+    MAX_CONTROL_FILE_BYTES,
+    MAX_DATA_FILE_BYTES,
+    DatasetIOError,
+    DatasetReader,
+)
 from mintmark.mint import MintError, mint, packaged_pack_dir, resolve_pack, schema_dir
 from mintmark.packs.loader import PackError
 from mintmark.packs.model import load_pack
@@ -92,6 +104,10 @@ def build_parser() -> argparse.ArgumentParser:
     ):
         sub = subparsers.add_parser(name, help=help_text)
         sub.add_argument("directory")
+        sub.add_argument(
+            "--trusted-manifest-sha256",
+            help="require MINTMARK.json to match this externally obtained SHA-256 digest",
+        )
         sub.add_argument("--json", action="store_true")
 
     for name, help_text in (
@@ -183,6 +199,7 @@ def _cmd_verify(args: argparse.Namespace) -> int:
         validators=_validators(),
         expected_taxonomy_pin=pin_digest(),
         known_labels=frozenset(label.value for label in Label),
+        trusted_manifest_sha256=args.trusted_manifest_sha256,
     )
     if args.json:
         print(json.dumps(report.to_json(), ensure_ascii=False, indent=2))
@@ -193,109 +210,166 @@ def _cmd_verify(args: argparse.Namespace) -> int:
 
 def _cmd_reproduce(args: argparse.Namespace) -> int:
     directory = Path(args.directory)
-    document = read_manifest(directory)
+    preflight = verify(
+        directory,
+        schema=_manifest_schema(),
+        validators=_validators(),
+        expected_taxonomy_pin=pin_digest(),
+        known_labels=frozenset(label.value for label in Label),
+        trusted_manifest_sha256=args.trusted_manifest_sha256,
+    )
+    if not preflight.ok:
+        differences = [f"preflight verification: {problem}" for problem in preflight.problems]
+        return _render_reproduce_result(directory, differences, args.json)
 
-    pack_hint = document["pack"]["name"]
-    pack_root = _locate_pack(directory, pack_hint)
-    if pack_root is None:
-        message = (
-            f"cannot locate pack {pack_hint!r} to re-mint from. Pass a checkout of "
-            "the pack at the version the manifest records."
-        )
-        if args.json:
-            print(json.dumps({"ok": False, "problems": [message]}, indent=2))
-        else:
-            print(f"mintmark: {message}", file=sys.stderr)
-        return EXIT_USAGE
+    try:
+        source_reader = DatasetReader(directory)
+    except (DatasetIOError, OSError, ValueError) as exc:
+        return _render_reproduce_result(directory, [str(exc)], args.json)
 
-    differences: list[str] = []
-    with tempfile.TemporaryDirectory() as temporary:
-        replica = Path(temporary) / "replica"
-        mint(
-            pack=pack_root,
-            recipe=document["recipe"]["name"],
-            seed=int(document["seed"]),
-            out=replica,
-            identifier_policy=document["identifier_policy"],
-            fmt=_format_of(document),
-            # Replay the overrides the original mint recorded, not the counts
-            # they resolved to. Passing the resolved counts marks the re-mint as
-            # overridden when the original was not, and the manifests then differ
-            # on a field that describes how the mint was invoked rather than what
-            # it produced. reproduce caught this in its own implementation.
-            records=document["recipe"]["parameters"].get("overrides", {}).get("records"),
-            invocation="mintmark reproduce",
-        )
-        for output in document["outputs"]:
-            name = output["path"]
-            if name == MANIFEST_FILENAME:
-                continue
-            original = (directory / name).read_bytes()
-            fresh_path = replica / name
-            if not fresh_path.exists():
-                differences.append(f"{name}: the re-mint did not produce this file")
-                continue
-            if original != fresh_path.read_bytes():
-                differences.append(f"{name}: bytes differ from the recorded mint")
-
-        fresh_manifest = json.loads((replica / MANIFEST_FILENAME).read_text(encoding="utf-8"))
-        drift = _manifest_drift(comparable(document), comparable(fresh_manifest))
-        # The engine version is the one field that can differ while every byte
-        # the determinism claim covers still matches, because the claim is about
-        # a fixed engine version rather than about all of them. Reporting that as
-        # a mismatch tells somebody their sound dataset is broken.
-        engine_only = set(drift) == {"mintmark.engine_version"}
-        if drift and not engine_only:
-            differences.extend(
-                f"{MANIFEST_FILENAME}: {path}: {a!r} against {b!r}"
-                for path, (a, b) in sorted(drift.items())
+    with source_reader:
+        try:
+            manifest_digest, _ = source_reader.digest(
+                MANIFEST_FILENAME, max_bytes=MAX_CONTROL_FILE_BYTES
             )
+            if manifest_digest != preflight.manifest_sha256:
+                return _render_reproduce_result(
+                    directory, ["dataset changed after preflight verification"], args.json
+                )
+            document = read_manifest(directory, reader=source_reader)
+            expected_sums = {
+                output["path"]: output["sha256"] for output in document["outputs"]
+            }
+            expected_sums[MANIFEST_FILENAME] = manifest_digest
+            if source_reader.read_text(
+                SUMS_FILENAME, max_bytes=MAX_CONTROL_FILE_BYTES
+            ) != render_sums(expected_sums):
+                return _render_reproduce_result(
+                    directory, [f"{SUMS_FILENAME} changed after preflight verification"], args.json
+                )
+            expected_entries = set(expected_sums) | {SUMS_FILENAME}
+            entries = source_reader.entries()
+            if any(entry.kind != "file" for entry in entries) or {
+                entry.name for entry in entries
+            } != expected_entries:
+                return _render_reproduce_result(
+                    directory, ["dataset inventory changed after preflight verification"], args.json
+                )
+        except (DatasetIOError, OSError, ValueError) as exc:
+            return _render_reproduce_result(directory, [str(exc)], args.json)
 
+        pack_hint = document["pack"]["name"]
+        pack_root = _locate_pack(directory, pack_hint)
+        if pack_root is None:
+            message = (
+                f"cannot locate pack {pack_hint!r} to re-mint from. Pass a checkout of "
+                "the pack at the version the manifest records."
+            )
+            if args.json:
+                print(json.dumps({"ok": False, "problems": [message]}, indent=2))
+            else:
+                print(f"mintmark: {message}", file=sys.stderr)
+            return EXIT_USAGE
+
+        differences = []
+        note: str | None = None
+        with tempfile.TemporaryDirectory() as temporary:
+            replica = Path(temporary) / "replica"
+            mint(
+                pack=pack_root,
+                recipe=document["recipe"]["name"],
+                seed=int(document["seed"]),
+                out=replica,
+                identifier_policy=document["identifier_policy"],
+                fmt=_format_of(document),
+                # Replay invocation overrides, not their resolved counts.
+                records=document["recipe"]["parameters"].get("overrides", {}).get("records"),
+                invocation="mintmark reproduce",
+            )
+            for output in document["outputs"]:
+                name = output["path"]
+                try:
+                    original = source_reader.read_bytes(name, max_bytes=MAX_DATA_FILE_BYTES)
+                except (DatasetIOError, OSError, ValueError) as exc:
+                    differences.append(str(exc))
+                    continue
+                fresh_path = replica / name
+                if not fresh_path.exists():
+                    differences.append(f"{name}: the re-mint did not produce this file")
+                    continue
+                if original != fresh_path.read_bytes():
+                    differences.append(f"{name}: bytes differ from the recorded mint")
+
+            fresh_manifest = json.loads(
+                (replica / MANIFEST_FILENAME).read_text(encoding="utf-8")
+            )
+            drift = _manifest_drift(comparable(document), comparable(fresh_manifest))
+            engine_version_path = ("mintmark", "engine_version")
+            engine_only = set(drift) == {engine_version_path}
+            if drift and not engine_only:
+                differences.extend(
+                    f"{MANIFEST_FILENAME}: {_display_path(path)}: {a!r} against {b!r}"
+                    for path, (a, b) in sorted(drift.items())
+                )
+            if engine_only and not differences:
+                recorded, running = drift[engine_version_path]
+                note = (
+                    f"data files are byte-identical, and were produced by engine "
+                    f"{recorded} rather than the {running} running here. The determinism "
+                    f"claim covers a fixed engine version, so this confirms the bytes "
+                    f"rather than the claim."
+                )
+
+    return _render_reproduce_result(directory, differences, args.json, note=note)
+
+
+def _render_reproduce_result(
+    directory: Path, differences: list[str], as_json: bool, *, note: str | None = None
+) -> int:
     payload: dict[str, Any] = {
         "ok": not differences,
         "directory": str(directory),
         "problems": differences,
     }
-    if engine_only and not differences:
-        recorded, running = drift["mintmark.engine_version"]
-        note = (
-            f"data files are byte-identical, and were produced by engine "
-            f"{recorded} rather than the {running} running here. The determinism "
-            f"claim covers a fixed engine version, so this confirms the bytes "
-            f"rather than the claim."
-        )
+    if note is not None:
         payload["note"] = note
-    if args.json:
+    if as_json:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     elif differences:
         for line in differences:
             print(f"MISMATCH: {line}", file=sys.stderr)
-    elif payload.get("note"):
+    elif note is not None:
         print("reproduce: byte-identical")
-        print(f"NOTE: {payload['note']}")
+        print(f"NOTE: {note}")
     else:
         print("reproduce: byte-identical")
     return EXIT_OK if not differences else EXIT_REPRODUCE_MISMATCH
 
 
-def _manifest_drift(recorded: dict[str, Any], fresh: dict[str, Any]) -> dict[str, tuple[Any, Any]]:
-    """Every leaf that differs, by dotted path.
+def _manifest_drift(
+    recorded: dict[str, Any], fresh: dict[str, Any]
+) -> dict[tuple[str, ...], tuple[Any, Any]]:
+    """Every leaf that differs, keyed by an unambiguous path tuple.
 
     `differs outside the excluded provenance block` was true and useless: it told
     a consumer that something was wrong without telling them what, which is the
     shape of message people learn to ignore.
     """
-    drift: dict[str, tuple[Any, Any]] = {}
+    drift: dict[tuple[str, ...], tuple[Any, Any]] = {}
 
-    def walk(left: Any, right: Any, path: str) -> None:
+    def walk(left: Any, right: Any, path: tuple[str, ...]) -> None:
         if isinstance(left, dict) and isinstance(right, dict):
             for key in sorted(set(left) | set(right)):
-                walk(left.get(key), right.get(key), f"{path}.{key}" if path else key)
+                walk(left.get(key), right.get(key), (*path, key))
         elif left != right:
             drift[path] = (left, right)
 
-    walk(recorded, fresh, "")
+    walk(recorded, fresh, ())
     return drift
+
+
+def _display_path(path: tuple[str, ...]) -> str:
+    return "/" + "/".join(part.replace("~", "~0").replace("/", "~1") for part in path)
 
 
 def _format_of(document: dict[str, Any]) -> str:

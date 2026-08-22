@@ -29,7 +29,8 @@
       ],
       "properties": {
         "engine_version": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 64
         },
         "manifest_schema_version": {
           "const": 2
@@ -46,10 +47,12 @@
       ],
       "properties": {
         "name": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 128
         },
         "version": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 64
         },
         "digest": {
           "type": "string",
@@ -66,7 +69,8 @@
       ],
       "properties": {
         "name": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 128
         },
         "parameters": {
           "type": "object",
@@ -78,8 +82,11 @@
           "properties": {
             "records": {
               "type": "object",
+              "maxProperties": 128,
               "additionalProperties": {
-                "type": "integer"
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 50000
               }
             },
             "date_window": {
@@ -91,15 +98,18 @@
               ],
               "properties": {
                 "start": {
-                  "type": "string"
+                  "type": "string",
+                  "maxLength": 64
                 },
                 "end": {
-                  "type": "string"
+                  "type": "string",
+                  "maxLength": 64
                 }
               }
             },
             "overrides": {
-              "type": "object"
+              "type": "object",
+              "maxProperties": 16
             }
           }
         }
@@ -108,7 +118,7 @@
     "seed": {
       "type": "string",
       "description": "The u64 master seed as a decimal string. Not a JSON number: a u64 exceeds what some parsers carry without precision loss.",
-      "pattern": "^[0-9]+$"
+    "pattern": "^(0|[1-9][0-9]{0,19})$"
     },
     "identifier_policy": {
       "enum": [
@@ -134,11 +144,16 @@
         },
         "datasets": {
           "type": "string",
+          "enum": [
+            "CC-BY-4.0",
+            "CC0-1.0"
+          ],
           "description": "SPDX identifier for the terms covering the emitted data."
         },
         "attribution": {
           "type": "string",
           "minLength": 1,
+          "maxLength": 512,
           "description": "The credit line a consumer reproduces to satisfy the dataset license. Present whatever the license is, because a consumer who wants to credit the source should not have to construct the string themselves."
         }
       }
@@ -153,10 +168,12 @@
       ],
       "properties": {
         "name": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 128
         },
         "version": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 64
         },
         "pin_digest": {
           "type": "string",
@@ -204,17 +221,22 @@
       "additionalProperties": false,
       "required": [
         "record_counts",
-        "distributions"
+        "distributions",
+        "coverage_targets"
       ],
       "properties": {
         "record_counts": {
           "type": "object",
+          "maxProperties": 128,
           "additionalProperties": {
-            "type": "integer"
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 50000
           }
         },
         "distributions": {
           "type": "array",
+          "maxItems": 256,
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -226,18 +248,23 @@
             ],
             "properties": {
               "site": {
-                "type": "string"
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*/[a-z][a-z0-9_]*$"
               },
               "target": {
                 "type": "object",
+                "maxProperties": 4096,
                 "additionalProperties": {
-                  "type": "string"
+                  "type": "string",
+                  "pattern": "^\\d+(\\.\\d+)?$"
                 }
               },
               "achieved": {
                 "type": "object",
+                "maxProperties": 4096,
                 "additionalProperties": {
-                  "type": "string"
+                  "type": "string",
+                  "pattern": "^\\d+(\\.\\d+)?$"
                 }
               },
               "within_tolerance": {
@@ -248,6 +275,7 @@
         },
         "coverage_targets": {
           "type": "array",
+          "maxItems": 32,
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -262,10 +290,14 @@
                 "type": "string"
               },
               "target": {
-                "type": "integer"
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100000
               },
               "achieved": {
-                "type": "integer"
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100000
               },
               "met": {
                 "type": "boolean"
@@ -277,6 +309,7 @@
     },
     "entity_coverage": {
       "type": "object",
+      "maxProperties": 32,
       "additionalProperties": {
         "type": "integer",
         "minimum": 0
@@ -292,16 +325,19 @@
       ],
       "properties": {
         "claim": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 512
         },
         "platforms": {
           "type": "array",
+          "maxItems": 16,
           "items": {
             "type": "string"
           }
         },
         "excluded": {
           "type": "array",
+          "maxItems": 16,
           "items": {
             "type": "string"
           }
@@ -318,10 +354,12 @@
       "description": "Excluded from the byte-level determinism claim. Everything else in this manifest is included.",
       "properties": {
         "created_utc": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 64
         },
         "invocation": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 1024
         }
       }
     }

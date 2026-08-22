@@ -224,12 +224,39 @@ def test_verify_json_payload_has_the_documented_shape(tmp_path: Path, capsys) ->
         "taxonomy_pin",
         "dataset_license",
         "attribution",
+        "manifest_sha256",
+        "authenticity",
         "problems",
     }
     assert payload["ok"] is True
     assert payload["dataset_license"] == "CC-BY-4.0"
     assert payload["attribution"].startswith("mintmark-example ")
+    assert len(payload["manifest_sha256"]) == 64
+    assert payload["authenticity"].startswith("self-consistency")
     assert payload["problems"] == []
+
+
+def test_verify_can_bind_to_an_externally_trusted_manifest_digest(tmp_path: Path) -> None:
+    from mintmark.manifest import file_digest
+
+    out = tmp_path / "run"
+    mint_to(out)
+    digest = file_digest(out / "MINTMARK.json")
+    assert (
+        main(["verify", str(out), "--trusted-manifest-sha256", digest])
+        == EXIT_OK
+    )
+    assert (
+        main(["verify", str(out), "--trusted-manifest-sha256", "0" * 64])
+        == EXIT_VERIFY_FAILED
+    )
+
+
+def test_manifest_drift_paths_cannot_collide_on_dotted_keys() -> None:
+    from mintmark.cli import _manifest_drift
+
+    drift = _manifest_drift({"a.b": 1, "a": {"b": 2}}, {"a.b": 2, "a": {"b": 1}})
+    assert set(drift) == {("a.b",), ("a", "b")}
 
 
 def test_inspect_json_payload_names_the_declarations(capsys) -> None:

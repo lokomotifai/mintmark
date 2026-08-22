@@ -24,7 +24,12 @@ from dataclasses import field as dataclass_field
 from pathlib import Path
 from typing import Any
 
-from mintmark.manifest.io import MAX_CONTROL_FILE_BYTES, DatasetIOError, DatasetReader
+from mintmark.manifest.io import (
+    MAX_CONTROL_FILE_BYTES,
+    DatasetIOError,
+    DatasetReader,
+    strict_json_loads,
+)
 
 MANIFEST_FILENAME = "MINTMARK.json"
 SCHEMA_VERSION = 2
@@ -213,15 +218,6 @@ def comparable(document: dict[str, Any]) -> dict[str, Any]:
     return dict(stripped)
 
 
-def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-    result: dict[str, Any] = {}
-    for key, value in pairs:
-        if key in result:
-            raise ValueError(f"{MANIFEST_FILENAME}: duplicate object key {key!r}")
-        result[key] = value
-    return result
-
-
 def read_manifest(directory: Path, *, reader: DatasetReader | None = None) -> dict[str, Any]:
     """Read a bounded manifest without following filesystem or JSON aliases."""
     owned_reader = reader is None
@@ -230,15 +226,9 @@ def read_manifest(directory: Path, *, reader: DatasetReader | None = None) -> di
         if active is None:
             active = DatasetReader(Path(directory))
         text = active.read_text(MANIFEST_FILENAME, max_bytes=MAX_CONTROL_FILE_BYTES)
-        document = json.loads(text, object_pairs_hook=_unique_object)
+        document = strict_json_loads(text, context=MANIFEST_FILENAME)
     except DatasetIOError as exc:
         raise ValueError(str(exc)) from exc
-    except json.JSONDecodeError as exc:
-        raise ValueError(
-            f"{MANIFEST_FILENAME}: invalid JSON at line {exc.lineno}, column {exc.colno}"
-        ) from exc
-    except RecursionError as exc:
-        raise ValueError(f"{MANIFEST_FILENAME}: JSON nesting is too deep") from exc
     finally:
         if owned_reader and active is not None:
             active.close()

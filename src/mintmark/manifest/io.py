@@ -8,6 +8,7 @@ symlink following, and parent-directory swap races from changing what is read.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import stat
@@ -41,7 +42,7 @@ class DatasetEntry:
 class DatasetReader:
     """Read one immutable view of a flat dataset directory."""
 
-    __slots__ = ("_fd", "_identity", "path")
+    __slots__ = ("_fd", "_fingerprints", "_identity", "path")
 
     def __init__(self, path: Path) -> None:
         self.path = Path(path)
@@ -61,6 +62,7 @@ class DatasetReader:
             os.close(self._fd)
             raise DatasetIOError(f"dataset path is not a directory: {self.path}")
         self._identity = (metadata.st_dev, metadata.st_ino)
+        self._fingerprints: dict[str, tuple[int, int, int, int, str]] = {}
 
     def __enter__(self) -> DatasetReader:
         return self
@@ -98,6 +100,22 @@ class DatasetReader:
         if before_identity != after_identity:
             raise DatasetIOError(f"{name}: file changed while it was being verified")
 
+    def _pin(
+        self, name: str, metadata: os.stat_result, digest: str
+    ) -> None:
+        fingerprint = (
+            metadata.st_dev,
+            metadata.st_ino,
+            metadata.st_size,
+            metadata.st_mtime_ns,
+            digest,
+        )
+        previous = self._fingerprints.setdefault(name, fingerprint)
+        if previous != fingerprint:
+            raise DatasetIOError(
+                f"{name}: a different file version was observed during verification"
+            )
+
     def read_bytes(self, name: str, *, max_bytes: int) -> bytes:
         descriptor = self._open_regular(name)
         try:
@@ -118,7 +136,9 @@ class DatasetReader:
             payload = b"".join(chunks)
             if len(payload) > max_bytes:
                 raise DatasetIOError(f"{name}: exceeds the {max_bytes}-byte verification limit")
-            self._assert_stable(name, before, os.fstat(descriptor))
+            after = os.fstat(descriptor)
+            self._assert_stable(name, before, after)
+            self._pin(name, after, hashlib.sha256(payload).hexdigest())
             return payload
         finally:
             os.close(descriptor)
@@ -148,8 +168,11 @@ class DatasetReader:
                 if size > max_bytes:
                     raise DatasetIOError(f"{name}: exceeds the {max_bytes}-byte verification limit")
                 digest.update(chunk)
-            self._assert_stable(name, before, os.fstat(descriptor))
-            return digest.hexdigest(), size
+            after = os.fstat(descriptor)
+            self._assert_stable(name, before, after)
+            hexdigest = digest.hexdigest()
+            self._pin(name, after, hexdigest)
+            return hexdigest, size
         finally:
             os.close(descriptor)
 
@@ -186,3 +209,24 @@ def digest_path(path: Path, *, max_bytes: int = MAX_DATA_FILE_BYTES) -> tuple[st
     path = Path(path)
     with DatasetReader(path.parent) as reader:
         return reader.digest(path.name, max_bytes=max_bytes)
+
+
+def strict_json_loads(text: str, *, context: str) -> object:
+    """Decode JSON while rejecting ambiguous duplicate mapping keys."""
+
+    def unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+        result: dict[str, object] = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError(f"{context}: duplicate object key {key!r}")
+            result[key] = value
+        return result
+
+    try:
+        return json.loads(text, object_pairs_hook=unique_object)
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            f"{context}: invalid JSON at line {exc.lineno}, column {exc.colno}"
+        ) from exc
+    except RecursionError as exc:
+        raise ValueError(f"{context}: JSON nesting is too deep") from exc
