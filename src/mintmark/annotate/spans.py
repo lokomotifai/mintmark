@@ -20,6 +20,9 @@ from dataclasses import dataclass
 
 from mintmark.annotate.taxonomy import Label
 
+# Punctuation that binds to the word before it in Turkish and English.
+CLINGING_PUNCTUATION = frozenset(",.;:!?)]}%")
+
 
 @dataclass(frozen=True, slots=True, order=True)
 class Span:
@@ -60,6 +63,13 @@ def normalize_whitespace(raw: str) -> tuple[str, list[int]]:
                 out.append(" ")
                 previous_was_space = True
             continue
+        # A space immediately before sentence punctuation is dropped. Template
+        # optionals naturally begin with the separator they introduce, as in
+        # "[?0.3:, ayrica ...]", and without this rule every such segment would
+        # render as "gerceklesti , ayrica". Any span this disturbs is caught by
+        # the re-extraction check in finalize rather than shipped misaligned.
+        if character in CLINGING_PUNCTUATION and out and out[-1] == " ":
+            out.pop()
         out.append(character)
         previous_was_space = False
 

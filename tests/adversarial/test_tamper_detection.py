@@ -1,0 +1,256 @@
+"""Invariant 3: verification fails on any single-byte tamper.
+
+The manifest is the reason a directory of files counts as evidence. If a dataset
+can be altered and still verify, the manifest is decoration.
+
+Every case here alters exactly one byte, or removes exactly one thing, and
+asserts that verification notices and says what it noticed.
+"""
+
+from __future__ import annotations
+
+import json
+import shutil
+from pathlib import Path
+
+import pytest
+
+from mintmark.cli import (
+    EXIT_OK,
+    EXIT_REPRODUCE_MISMATCH,
+    EXIT_VERIFY_FAILED,
+    main,
+)
+from mintmark.manifest import MANIFEST_FILENAME, SUMS_FILENAME, VALIDATOR_WARNING
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+PACK = REPO_ROOT / "packs" / "example"
+
+
+@pytest.fixture(scope="module")
+def minted(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """One small mint, reused by every tamper case through a copy."""
+    out = tmp_path_factory.mktemp("pristine") / "run"
+    assert (
+        main(
+            [
+                "mint",
+                "--pack",
+                str(PACK),
+                "--recipe",
+                "demo",
+                "--seed",
+                "42",
+                "--records",
+                "customer=30",
+                "--records",
+                "transaction=30",
+                "--out",
+                str(out),
+            ]
+        )
+        == EXIT_OK
+    )
+    return out
+
+
+@pytest.fixture
+def dataset(minted: Path, tmp_path: Path) -> Path:
+    target = tmp_path / "run"
+    shutil.copytree(minted, target)
+    return target
+
+
+def test_the_pristine_dataset_verifies(dataset: Path) -> None:
+    """Otherwise every tamper below could be failing for the wrong reason."""
+    assert main(["verify", str(dataset)]) == EXIT_OK
+
+
+@pytest.mark.adversarial
+def test_a_single_flipped_byte_in_a_data_file_is_caught(dataset: Path) -> None:
+    path = dataset / "customer.jsonl"
+    raw = bytearray(path.read_bytes())
+    raw[100] = raw[100] ^ 0x01
+    path.write_bytes(bytes(raw))
+    assert main(["verify", str(dataset)]) == EXIT_VERIFY_FAILED
+
+
+@pytest.mark.adversarial
+def test_a_single_flipped_byte_in_a_sidecar_is_caught(dataset: Path) -> None:
+    path = dataset / "transaction.labels.jsonl"
+    raw = bytearray(path.read_bytes())
+    raw[50] = raw[50] ^ 0x01
+    path.write_bytes(bytes(raw))
+    assert main(["verify", str(dataset)]) == EXIT_VERIFY_FAILED
+
+
+@pytest.mark.adversarial
+def test_an_altered_checksum_in_the_manifest_is_caught(dataset: Path) -> None:
+    path = dataset / MANIFEST_FILENAME
+    document = json.loads(path.read_text(encoding="utf-8"))
+    original = document["outputs"][0]["sha256"]
+    document["outputs"][0]["sha256"] = "0" * 64
+    path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+    assert main(["verify", str(dataset)]) == EXIT_VERIFY_FAILED
+    assert original != "0" * 64
+
+
+@pytest.mark.adversarial
+def test_an_altered_sums_file_is_caught(dataset: Path) -> None:
+    path = dataset / SUMS_FILENAME
+    lines = path.read_text(encoding="utf-8").splitlines()
+    lines[0] = "0" * 64 + "  " + lines[0].split("  ", 1)[1]
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    assert main(["verify", str(dataset)]) == EXIT_VERIFY_FAILED
+
+
+@pytest.mark.adversarial
+def test_a_removed_manifest_is_caught(dataset: Path) -> None:
+    (dataset / MANIFEST_FILENAME).unlink()
+    assert main(["verify", str(dataset)]) == EXIT_VERIFY_FAILED
+
+
+@pytest.mark.adversarial
+def test_a_removed_data_file_is_caught(dataset: Path) -> None:
+    (dataset / "customer.jsonl").unlink()
+    assert main(["verify", str(dataset)]) == EXIT_VERIFY_FAILED
+
+
+@pytest.mark.adversarial
+def test_an_added_file_is_caught(dataset: Path) -> None:
+    """A file nobody vouched for is as much a problem as an altered one."""
+    (dataset / "extra.jsonl").write_text('{"smuggled":true}\n', encoding="utf-8")
+    assert main(["verify", str(dataset)]) == EXIT_VERIFY_FAILED
+
+
+@pytest.mark.adversarial
+def test_a_shifted_span_offset_is_caught(dataset: Path) -> None:
+    """The sidecar's own digest binds spans to the text they index."""
+    path = dataset / "transaction.labels.jsonl"
+    lines = path.read_text(encoding="utf-8").splitlines()
+    record = json.loads(lines[0])
+    if not record["spans"]:
+        pytest.skip("the first document carries no spans")
+    record["spans"][0]["end"] += 5000
+    lines[0] = json.dumps(record, ensure_ascii=False, separators=(",", ":"))
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    # The checksum catches the edit first, which is correct; both are failures.
+    assert main(["verify", str(dataset)]) == EXIT_VERIFY_FAILED
+
+
+@pytest.mark.adversarial
+def test_a_stripped_validator_warning_is_caught(tmp_path: Path) -> None:
+    """This is how a checksum-valid dataset would circulate unlabeled."""
+    out = tmp_path / "validator-run"
+    assert (
+        main(
+            [
+                "mint",
+                "--pack",
+                str(PACK),
+                "--recipe",
+                "demo",
+                "--seed",
+                "7",
+                "--identifier-policy",
+                "validator",
+                "--records",
+                "customer=10",
+                "--records",
+                "transaction=10",
+                "--out",
+                str(out),
+            ]
+        )
+        == EXIT_OK
+    )
+
+    document = json.loads((out / MANIFEST_FILENAME).read_text(encoding="utf-8"))
+    assert document["validator_warning"] == VALIDATOR_WARNING
+    assert main(["verify", str(out)]) == EXIT_OK
+
+    del document["validator_warning"]
+    (out / MANIFEST_FILENAME).write_text(
+        json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    assert main(["verify", str(out)]) == EXIT_VERIFY_FAILED
+
+
+@pytest.mark.adversarial
+def test_an_altered_validator_warning_is_caught(tmp_path: Path) -> None:
+    out = tmp_path / "validator-run"
+    main(
+        [
+            "mint",
+            "--pack",
+            str(PACK),
+            "--recipe",
+            "demo",
+            "--seed",
+            "7",
+            "--identifier-policy",
+            "validator",
+            "--records",
+            "customer=10",
+            "--records",
+            "transaction=10",
+            "--out",
+            str(out),
+        ]
+    )
+    path = out / MANIFEST_FILENAME
+    document = json.loads(path.read_text(encoding="utf-8"))
+    document["validator_warning"] = "This dataset is completely safe."
+    path.write_text(json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    assert main(["verify", str(path.parent)]) == EXIT_VERIFY_FAILED
+
+
+@pytest.mark.adversarial
+def test_a_warning_under_a_safe_policy_is_caught(dataset: Path) -> None:
+    """The warning means something. It cannot appear where it does not apply."""
+    path = dataset / MANIFEST_FILENAME
+    document = json.loads(path.read_text(encoding="utf-8"))
+    document["validator_warning"] = VALIDATOR_WARNING
+    path.write_text(json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    assert main(["verify", str(dataset)]) == EXIT_VERIFY_FAILED
+
+
+@pytest.mark.adversarial
+def test_an_altered_taxonomy_pin_is_caught(dataset: Path) -> None:
+    path = dataset / MANIFEST_FILENAME
+    document = json.loads(path.read_text(encoding="utf-8"))
+    document["taxonomy"]["pin_digest"] = "f" * 64
+    path.write_text(json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    assert main(["verify", str(dataset)]) == EXIT_VERIFY_FAILED
+
+
+def test_reproduce_detects_a_changed_data_file(dataset: Path) -> None:
+    """A tamper that also updated the checksums would still fail reproduction."""
+    path = dataset / "customer.jsonl"
+    lines = path.read_text(encoding="utf-8").splitlines()
+    record = json.loads(lines[0])
+    record["first_name"] = "Değiştirildi"
+    lines[0] = json.dumps(record, ensure_ascii=False, separators=(",", ":"))
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    from mintmark.manifest import file_digest, render_sums
+
+    manifest_path = dataset / MANIFEST_FILENAME
+    document = json.loads(manifest_path.read_text(encoding="utf-8"))
+    sums = {}
+    for output in document["outputs"]:
+        if output["path"] == "customer.jsonl":
+            output["sha256"] = file_digest(path)
+            output["bytes"] = path.stat().st_size
+        sums[output["path"]] = output["sha256"]
+    manifest_path.write_text(
+        json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    sums[MANIFEST_FILENAME] = file_digest(manifest_path)
+    (dataset / SUMS_FILENAME).write_text(render_sums(sums), encoding="utf-8")
+
+    # Checksums now agree with the altered file, so verify passes.
+    assert main(["verify", str(dataset)]) == EXIT_OK
+    # Reproduction re-derives the data and does not.
+    assert main(["reproduce", str(dataset)]) == EXIT_REPRODUCE_MISMATCH

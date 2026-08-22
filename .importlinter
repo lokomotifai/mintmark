@@ -23,7 +23,7 @@ include_external_packages = True
 name = Module layers follow the declared dependency direction
 type = layers
 layers =
-    (cli)
+    (cli) : (mint) : (api)
     (manifest)
     (emit)
     (annotate) : (identifiers) : (packs)
@@ -38,7 +38,7 @@ layers =
 ;     annotate-narrow         WP-04  ACTIVE
 ;     packs-narrow            WP-06  ACTIVE
 ;     emit-narrow             WP-09  ACTIVE
-;     manifest-narrow         WP-10
+;     manifest-narrow         WP-10  ACTIVE
 ;
 ; Uncomment a contract in its owning milestone, never earlier and never later.
 ; WP-14's gate asserts that every contract below is active.
@@ -70,16 +70,16 @@ forbidden_modules =
     mintmark.packs
 allow_indirect_imports = False
 
-; [importlinter:contract:manifest-narrow]
-; name = manifest imports only emit and engine
-; type = forbidden
-; source_modules =
-;     mintmark.manifest
-; forbidden_modules =
-;     mintmark.cli
-;     mintmark.identifiers
-;     mintmark.packs
-; allow_indirect_imports = False
+[importlinter:contract:manifest-narrow]
+name = manifest imports only emit and engine
+type = forbidden
+source_modules =
+    mintmark.manifest
+forbidden_modules =
+    mintmark.cli
+    mintmark.identifiers
+    mintmark.packs
+allow_indirect_imports = False
 
 [importlinter:contract:identifiers-narrow]
 name = identifiers imports only engine

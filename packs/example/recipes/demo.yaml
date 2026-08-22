@@ -1,0 +1,11 @@
+schema_version: 1
+name: demo
+records:
+  customer: 100
+  transaction: 100
+date_window:
+  start: "2026-01-01T00:00:00+00:00"
+  end: "2026-12-31T23:59:59+00:00"
+doc_mix:
+  txn_descriptions: "1"
+special_rate: "0.05"

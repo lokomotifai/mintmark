@@ -146,11 +146,10 @@ def test_an_interrupted_mint_leaves_nothing_behind(tmp_path: Path) -> None:
     """Either a complete mint or no directory. Never something in between."""
     target = tmp_path / "run"
 
-    with pytest.raises(RuntimeError):
-        with staged_output(target) as staged:
-            with staged.open("customer.jsonl") as handle:
-                handle.write("partial")
-            raise RuntimeError("interrupted mid-mint")
+    with pytest.raises(RuntimeError), staged_output(target) as staged:
+        with staged.open("customer.jsonl") as handle:
+            handle.write("partial")
+        raise RuntimeError("interrupted mid-mint")
 
     assert not target.exists()
     assert list(tmp_path.iterdir()) == [], "a staging directory survived the failure"
@@ -159,10 +158,9 @@ def test_an_interrupted_mint_leaves_nothing_behind(tmp_path: Path) -> None:
 def test_a_keyboard_interrupt_also_cleans_up(tmp_path: Path) -> None:
     """KeyboardInterrupt is a BaseException, so `except Exception` would miss it."""
     target = tmp_path / "run"
-    with pytest.raises(KeyboardInterrupt):
-        with staged_output(target) as staged:
-            staged.open("x.jsonl").close()
-            raise KeyboardInterrupt
+    with pytest.raises(KeyboardInterrupt), staged_output(target) as staged:
+        staged.open("x.jsonl").close()
+        raise KeyboardInterrupt
     assert not target.exists()
     assert list(tmp_path.iterdir()) == []
 
@@ -181,9 +179,8 @@ def test_an_existing_output_directory_is_never_overwritten(tmp_path: Path) -> No
 
 
 def test_files_are_written_with_lf_endings(tmp_path: Path) -> None:
-    with staged_output(tmp_path / "run") as staged:
-        with staged.open("data.jsonl") as handle:
-            handle.write("first\nsecond\n")
+    with staged_output(tmp_path / "run") as staged, staged.open("data.jsonl") as handle:
+        handle.write("first\nsecond\n")
     raw = (tmp_path / "run" / "data.jsonl").read_bytes()
     assert b"\r\n" not in raw
     assert raw == b"first\nsecond\n"

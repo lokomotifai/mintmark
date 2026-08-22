@@ -1,0 +1,8 @@
+schema_version: 1
+name: mintmark-example
+version: 0.1.0
+requires_core: ">=0.1,<0.2"
+locale: tr-TR
+allowed_identifier_policies: [safe, validator]
+description: Fixture pack for the quickstart and the test suite. Not a sector pack.
+description_tr: Hizli baslangic ve test paketi icin ornek paket. Sektor paketi degildir.

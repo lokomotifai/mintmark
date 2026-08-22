@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lokomotifai.dev/mintmark/schemas/manifest.schema.json",
+  "title": "MINTMARK.json, manifest schema version 1",
+  "description": "The provenance record that makes a directory of files a Mintmark dataset. A dataset without its manifest is not a Mintmark deliverable.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["mintmark", "pack", "recipe", "seed", "identifier_policy", "taxonomy",
+               "outputs", "stats", "entity_coverage", "determinism", "provenance"],
+  "properties": {
+    "mintmark": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["engine_version", "manifest_schema_version"],
+      "properties": {
+        "engine_version": {"type": "string"},
+        "manifest_schema_version": {"type": "integer", "const": 1}
+      }
+    },
+    "pack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "digest"],
+      "properties": {
+        "name": {"type": "string"},
+        "version": {"type": "string"},
+        "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "recipe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "parameters"],
+      "properties": {
+        "name": {"type": "string"},
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["records", "date_window"],
+          "properties": {
+            "records": {"type": "object", "additionalProperties": {"type": "integer"}},
+            "date_window": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["start", "end"],
+              "properties": {"start": {"type": "string"}, "end": {"type": "string"}}
+            },
+            "overrides": {"type": "object"}
+          }
+        }
+      }
+    },
+    "seed": {
+      "type": "string",
+      "description": "The u64 master seed as a decimal string. Not a JSON number: a u64 exceeds what some parsers carry without precision loss.",
+      "pattern": "^[0-9]+$"
+    },
+    "identifier_policy": {"enum": ["safe", "validator"]},
+    "validator_warning": {
+      "type": "string",
+      "description": "Present if and only if identifier_policy is validator."
+    },
+    "taxonomy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "pin_digest"],
+      "properties": {
+        "name": {"type": "string"},
+        "version": {"type": "string"},
+        "pin_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "bytes", "sha256", "records"],
+        "properties": {
+          "path": {"type": "string"},
+          "bytes": {"type": "integer", "minimum": 0},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "records": {"type": "integer", "minimum": 0}
+        }
+      }
+    },
+    "stats": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["record_counts", "distributions"],
+      "properties": {
+        "record_counts": {"type": "object", "additionalProperties": {"type": "integer"}},
+        "distributions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["site", "target", "achieved", "within_tolerance"],
+            "properties": {
+              "site": {"type": "string"},
+              "target": {"type": "object", "additionalProperties": {"type": "string"}},
+              "achieved": {"type": "object", "additionalProperties": {"type": "string"}},
+              "within_tolerance": {"type": "boolean"}
+            }
+          }
+        },
+        "coverage_targets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["label", "target", "achieved", "met"],
+            "properties": {
+              "label": {"type": "string"},
+              "target": {"type": "integer"},
+              "achieved": {"type": "integer"},
+              "met": {"type": "boolean"}
+            }
+          }
+        }
+      }
+    },
+    "entity_coverage": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+    "determinism": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claim", "platforms", "excluded"],
+      "properties": {
+        "claim": {"type": "string"},
+        "platforms": {"type": "array", "items": {"type": "string"}},
+        "excluded": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["created_utc", "invocation"],
+      "description": "Excluded from the byte-level determinism claim. Everything else in this manifest is included.",
+      "properties": {
+        "created_utc": {"type": "string"},
+        "invocation": {"type": "string"}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"identifier_policy": {"const": "validator"}}, "required": ["identifier_policy"]},
+      "then": {"required": ["validator_warning"]},
+      "else": {"not": {"required": ["validator_warning"]}}
+    }
+  ]
+}
