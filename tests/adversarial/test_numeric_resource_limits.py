@@ -48,7 +48,9 @@ def test_overprecise_probability_is_rejected_during_pack_load(tmp_path: Path) ->
 
     def overprecision(document: dict[str, object]) -> None:
         field = next(
-            item for item in document["fields"] if item["name"] == "counterparty_iban"  # type: ignore[index, union-attr]
+            item
+            for item in document["fields"]
+            if item["name"] == "counterparty_iban"  # type: ignore[index, union-attr]
         )
         field["null_rate"] = "0.00000000000000000001"  # type: ignore[index]
 

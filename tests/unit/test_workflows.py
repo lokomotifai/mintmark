@@ -149,9 +149,7 @@ def test_uv_and_the_build_backend_are_exactly_locked() -> None:
 def test_pull_request_code_never_receives_the_private_canary() -> None:
     document = load(WORKFLOW_DIR / "ci.yml")
     steps = document["jobs"]["canary"]["steps"]
-    secret_steps = [
-        step for step in steps if "MINTMARK_CANARY" in step.get("env", {})
-    ]
+    secret_steps = [step for step in steps if "MINTMARK_CANARY" in step.get("env", {})]
     assert len(secret_steps) == 1
     condition = secret_steps[0].get("if", "")
     assert "github.event_name == 'push'" in condition

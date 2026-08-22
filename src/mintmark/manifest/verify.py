@@ -216,9 +216,7 @@ def verify(
             if report.identifier_policy == "safe":
                 _sweep_identifiers(records, validators, report)
         except Exception as exc:  # verifier boundary: hostile input must become a report
-            report.problems.append(
-                f"verification aborted safely: {type(exc).__name__}: {exc}"
-            )
+            report.problems.append(f"verification aborted safely: {type(exc).__name__}: {exc}")
 
     return report
 
@@ -260,9 +258,7 @@ def _check_validator_warning(document: dict[str, Any], report: VerifyReport) -> 
         report.problems.append("validator_warning present under a safe policy")
 
 
-def _check_checksums(
-    reader: DatasetReader, document: dict[str, Any], report: VerifyReport
-) -> None:
+def _check_checksums(reader: DatasetReader, document: dict[str, Any], report: VerifyReport) -> None:
     for output in document["outputs"]:
         report.checksums_checked += 1
         try:
@@ -301,13 +297,9 @@ def _check_checksums(
             )
 
 
-def _check_sums_file(
-    reader: DatasetReader, document: dict[str, Any], report: VerifyReport
-) -> None:
+def _check_sums_file(reader: DatasetReader, document: dict[str, Any], report: VerifyReport) -> None:
     try:
-        recorded = parse_sums(
-            reader.read_text(SUMS_FILENAME, max_bytes=MAX_CONTROL_FILE_BYTES)
-        )
+        recorded = parse_sums(reader.read_text(SUMS_FILENAME, max_bytes=MAX_CONTROL_FILE_BYTES))
     except (DatasetIOError, OSError, ValueError) as exc:
         report.problems.append(str(exc))
         return
@@ -323,9 +315,7 @@ def _check_sums_file(
         report.problems.append(f"{SUMS_FILENAME} does not cover {MANIFEST_FILENAME}")
     else:
         try:
-            manifest_digest, _ = reader.digest(
-                MANIFEST_FILENAME, max_bytes=MAX_CONTROL_FILE_BYTES
-            )
+            manifest_digest, _ = reader.digest(MANIFEST_FILENAME, max_bytes=MAX_CONTROL_FILE_BYTES)
         except (DatasetIOError, OSError) as exc:
             report.problems.append(str(exc))
         else:
@@ -431,15 +421,11 @@ def _load_primary_records(
 
         loaded[name] = tuple(rows)
         if output["records"] != len(rows):
-            report.problems.append(
-                f"{name}: records claim {output['records']}, actual {len(rows)}"
-            )
+            report.problems.append(f"{name}: records claim {output['records']}, actual {len(rows)}")
     return loaded
 
 
-def _record_counts(
-    records: dict[str, tuple[dict[str, object], ...]]
-) -> dict[str, int]:
+def _record_counts(records: dict[str, tuple[dict[str, object], ...]]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for name, rows in records.items():
         suffix = ".jsonl" if name.endswith(".jsonl") else ".csv"
@@ -477,8 +463,7 @@ def _check_manifest_claims(
         report.problems.append("recipe.parameters.records does not match parsed primary outputs")
 
     by_type = {
-        name.removesuffix(".jsonl").removesuffix(".csv"): rows
-        for name, rows in records.items()
+        name.removesuffix(".jsonl").removesuffix(".csv"): rows for name, rows in records.items()
     }
     seen_sites: set[str] = set()
     for distribution in document["stats"]["distributions"]:
@@ -507,9 +492,7 @@ def _check_manifest_claims(
             report.problems.append(
                 f"stats.distributions site {site!r} has fabricated achieved values"
             )
-        within = all(
-            abs(_scaled(achieved[key]) - _scaled(target[key])) <= 200 for key in target
-        )
+        within = all(abs(_scaled(achieved[key]) - _scaled(target[key])) <= 200 for key in target)
         if distribution["within_tolerance"] is not within:
             report.problems.append(f"stats.distributions site {site!r} has a false tolerance flag")
 
@@ -602,9 +585,7 @@ def _check_spans(
                 )
                 continue
             try:
-                record = strict_json_loads(
-                    line, context=f"{sidecar_name} line {number}"
-                )
+                record = strict_json_loads(line, context=f"{sidecar_name} line {number}")
             except ValueError as exc:
                 report.problems.append(str(exc))
                 continue
@@ -630,14 +611,10 @@ def _check_spans(
                 report.problems.append(f"{sidecar_name} line {number}: malformed sidecar record")
                 continue
             if set(record) != {"doc_id", "text_sha256", "spans"}:
-                report.problems.append(
-                    f"{sidecar_name} line {number}: unsupported sidecar fields"
-                )
+                report.problems.append(f"{sidecar_name} line {number}: unsupported sidecar fields")
                 continue
             if len(record["spans"]) > MAX_SPANS_PER_DOCUMENT:
-                report.problems.append(
-                    f"{sidecar_name} line {number}: too many spans"
-                )
+                report.problems.append(f"{sidecar_name} line {number}: too many spans")
                 continue
             actual_digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
             if actual_digest != record["text_sha256"]:
@@ -665,9 +642,7 @@ def _check_spans(
                     )
                     continue
                 if set(span) != {"start", "end", "label"}:
-                    report.problems.append(
-                        f"{sidecar_name} line {number}: unsupported span fields"
-                    )
+                    report.problems.append(f"{sidecar_name} line {number}: unsupported span fields")
                     continue
                 if span["end"] > len(text) or span["start"] < 0 or span["start"] >= span["end"]:
                     report.problems.append(
@@ -708,9 +683,7 @@ def _find_data_file(names: set[str], stem: str) -> str | None:
     return None
 
 
-def _document_texts(
-    records: tuple[dict[str, object], ...], name: str
-) -> dict[str, str]:
+def _document_texts(records: tuple[dict[str, object], ...], name: str) -> dict[str, str]:
     """Map document id to text, for whichever field carries the document."""
     texts: dict[str, str] = {}
     for number, record in enumerate(records, start=1):

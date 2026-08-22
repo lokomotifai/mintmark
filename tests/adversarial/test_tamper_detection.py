@@ -220,9 +220,7 @@ def test_special_file_is_rejected_without_blocking(dataset: Path) -> None:
 
 @pytest.mark.adversarial
 def test_duplicate_manifest_json_keys_fail_closed(dataset: Path) -> None:
-    (dataset / MANIFEST_FILENAME).write_text(
-        '{"mintmark": {}, "mintmark": {}}\n', encoding="utf-8"
-    )
+    (dataset / MANIFEST_FILENAME).write_text('{"mintmark": {}, "mintmark": {}}\n', encoding="utf-8")
     assert main(["verify", str(dataset)]) == EXIT_VERIFY_FAILED
 
 

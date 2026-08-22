@@ -260,9 +260,7 @@ def _cmd_reproduce(args: argparse.Namespace) -> int:
                     directory, ["dataset changed after preflight verification"], args.json
                 )
             document = read_manifest(directory, reader=source_reader)
-            expected_sums = {
-                output["path"]: output["sha256"] for output in document["outputs"]
-            }
+            expected_sums = {output["path"]: output["sha256"] for output in document["outputs"]}
             expected_sums[MANIFEST_FILENAME] = manifest_digest
             if source_reader.read_text(
                 SUMS_FILENAME, max_bytes=MAX_CONTROL_FILE_BYTES
@@ -272,9 +270,10 @@ def _cmd_reproduce(args: argparse.Namespace) -> int:
                 )
             expected_entries = set(expected_sums) | {SUMS_FILENAME}
             entries = source_reader.entries()
-            if any(entry.kind != "file" for entry in entries) or {
-                entry.name for entry in entries
-            } != expected_entries:
+            if (
+                any(entry.kind != "file" for entry in entries)
+                or {entry.name for entry in entries} != expected_entries
+            ):
                 return _render_reproduce_result(
                     directory, ["dataset inventory changed after preflight verification"], args.json
                 )
@@ -323,9 +322,7 @@ def _cmd_reproduce(args: argparse.Namespace) -> int:
                 if original != fresh_path.read_bytes():
                     differences.append(f"{name}: bytes differ from the recorded mint")
 
-            fresh_manifest = json.loads(
-                (replica / MANIFEST_FILENAME).read_text(encoding="utf-8")
-            )
+            fresh_manifest = json.loads((replica / MANIFEST_FILENAME).read_text(encoding="utf-8"))
             drift = _manifest_drift(comparable(document), comparable(fresh_manifest))
             engine_version_path = ("mintmark", "engine_version")
             engine_only = set(drift) == {engine_version_path}

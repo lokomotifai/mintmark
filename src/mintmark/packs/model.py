@@ -32,6 +32,7 @@ from typing import Any
 import jsonschema
 
 from mintmark.engine.draws import TWO64
+from mintmark.engine.version import VERSION
 from mintmark.packs.digest import PackDigestError, pack_digest
 from mintmark.packs.loader import PackError, load_yaml
 from mintmark.packs.semver import CoreRange, parse_range
@@ -319,9 +320,7 @@ def load_pack(root: Path, *, core_version: str | None = None) -> Pack:
 
     requires_core = parse_range(manifest["requires_core"])
     if core_version is None:
-        from mintmark import __version__
-
-        core_version = __version__
+        core_version = VERSION
     if not requires_core.contains(core_version):
         raise PackError(
             manifest_path,

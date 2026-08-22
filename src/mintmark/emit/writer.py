@@ -29,9 +29,7 @@ class StagedOutput:
     def __init__(self, target: Path) -> None:
         self._target = target
         target.parent.mkdir(parents=True, exist_ok=True)
-        self._staging = Path(
-            tempfile.mkdtemp(prefix=f".{target.name}.staging-", dir=target.parent)
-        )
+        self._staging = Path(tempfile.mkdtemp(prefix=f".{target.name}.staging-", dir=target.parent))
         flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
         self._directory_fd = os.open(self._staging, flags)
         metadata = os.fstat(self._directory_fd)

@@ -7,7 +7,9 @@ compatibility promise and may change in any release.
 
 from __future__ import annotations
 
-__version__ = "0.1.3"
+from mintmark.engine.version import VERSION as _VERSION
+
+__version__ = _VERSION
 
 __all__ = ["__version__", "mint", "verify"]
 

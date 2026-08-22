@@ -100,9 +100,7 @@ class DatasetReader:
         if before_identity != after_identity:
             raise DatasetIOError(f"{name}: file changed while it was being verified")
 
-    def _pin(
-        self, name: str, metadata: os.stat_result, digest: str
-    ) -> None:
+    def _pin(self, name: str, metadata: os.stat_result, digest: str) -> None:
         fingerprint = (
             metadata.st_dev,
             metadata.st_ino,

@@ -20,9 +20,7 @@ from mintmark.mint import schema_dir
 __all__ = ["verify"]
 
 
-def verify(
-    directory: str | Path, *, trusted_manifest_sha256: str | None = None
-) -> VerifyReport:
+def verify(directory: str | Path, *, trusted_manifest_sha256: str | None = None) -> VerifyReport:
     """Revalidate a dataset against its manifest, recomputing every claim."""
     schema: dict[str, Any] = json.loads(
         (schema_dir() / "manifest.schema.json").read_text(encoding="utf-8")

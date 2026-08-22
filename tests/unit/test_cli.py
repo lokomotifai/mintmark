@@ -253,14 +253,8 @@ def test_verify_can_bind_to_an_externally_trusted_manifest_digest(tmp_path: Path
     out = tmp_path / "run"
     mint_to(out)
     digest = file_digest(out / "MINTMARK.json")
-    assert (
-        main(["verify", str(out), "--trusted-manifest-sha256", digest])
-        == EXIT_OK
-    )
-    assert (
-        main(["verify", str(out), "--trusted-manifest-sha256", "0" * 64])
-        == EXIT_VERIFY_FAILED
-    )
+    assert main(["verify", str(out), "--trusted-manifest-sha256", digest]) == EXIT_OK
+    assert main(["verify", str(out), "--trusted-manifest-sha256", "0" * 64]) == EXIT_VERIFY_FAILED
 
 
 def test_manifest_drift_paths_cannot_collide_on_dotted_keys() -> None:
