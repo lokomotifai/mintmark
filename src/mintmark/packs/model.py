@@ -19,6 +19,9 @@ taxonomy enum stay identical, so the two cannot drift apart silently.
 from __future__ import annotations
 
 import json
+import re
+from collections import Counter
+from collections.abc import Mapping
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 from datetime import datetime
@@ -35,6 +38,14 @@ from mintmark.packs.semver import CoreRange, parse_range
 
 SCHEMA_FILENAME = "pack.schema.json"
 MAX_DECIMAL_PLACES = 19
+MAX_DECLARATION_FILES = 1_024
+MAX_RECORD_TYPES = 128
+MAX_RECIPES = 128
+MAX_RECORDS_PER_TYPE = 50_000
+MAX_TOTAL_RECORDS = 100_000
+MAX_TEMPLATE_ENTRIES_PER_SET = 4_096
+MAX_LEXICON_ITEMS = 100_000
+MAX_LEXICON_VALUE_CHARS = 4_096
 
 
 def _schema_root() -> Path:
@@ -155,7 +166,7 @@ class Pack:
     record_types: tuple[RecordType, ...]
     recipes: dict[str, Recipe]
     template_sets: dict[str, tuple[TemplateEntry, ...]]
-    lexicons: dict[str, Any]
+    lexicons: dict[str, tuple[str, ...]]
     digest: str
 
     def record_type(self, name: str) -> RecordType:
@@ -176,11 +187,60 @@ def _validate(path: Path, document: dict[str, Any], definition: str | None = Non
         SCHEMA if definition is None else {**SCHEMA["$defs"][definition], "$defs": SCHEMA["$defs"]}
     )
     validator = jsonschema.Draft202012Validator(schema)
-    errors = sorted(validator.iter_errors(document), key=lambda e: list(e.absolute_path))
-    if errors:
-        first = errors[0]
+    first = min(
+        validator.iter_errors(document),
+        key=lambda error: list(error.absolute_path),
+        default=None,
+    )
+    if first is not None:
         location = "/".join(str(part) for part in first.absolute_path) or "document"
         raise PackError(path, location, "schema", first.message)
+
+
+def record_count_problem(counts: Mapping[str, object]) -> tuple[str, str] | None:
+    total = 0
+    for name, count in counts.items():
+        if not isinstance(count, int) or isinstance(count, bool) or count < 0:
+            return "record-count-shape", f"record count for {name!r} is a non-negative integer"
+        if count > MAX_RECORDS_PER_TYPE:
+            return (
+                "record-count-limit",
+                f"record count for {name!r} is {count}; maximum is {MAX_RECORDS_PER_TYPE}",
+            )
+        total += count
+    if total > MAX_TOTAL_RECORDS:
+        return (
+            "total-record-count-limit",
+            f"total record count is {total}; maximum is {MAX_TOTAL_RECORDS}",
+        )
+    return None
+
+
+def _validate_record_counts(path: Path, counts: Mapping[str, object]) -> None:
+    problem = record_count_problem(counts)
+    if problem is not None:
+        rule, detail = problem
+        raise PackError(path, "records", rule, detail)
+
+
+def _declaration_paths(directory: Path, *, recursive: bool = False) -> list[Path]:
+    if not directory.is_dir():
+        return []
+    iterator = directory.rglob("*.yaml") if recursive else directory.glob("*.yaml")
+    paths: list[Path] = []
+    for path in iterator:
+        relative = path.relative_to(directory)
+        if any(part.startswith(".") for part in relative.parts):
+            continue
+        paths.append(path)
+        if len(paths) > MAX_DECLARATION_FILES:
+            raise PackError(
+                directory,
+                "declarations",
+                "declaration-file-limit",
+                f"a declaration directory may contain at most {MAX_DECLARATION_FILES} YAML files",
+            )
+    return sorted(paths)
 
 
 def _decimal(
@@ -289,10 +349,8 @@ def load_pack(root: Path, *, core_version: str | None = None) -> Pack:
 
 def _load_record_types(root: Path) -> tuple[RecordType, ...]:
     directory = root / "fields"
-    if not directory.is_dir():
-        return ()
     types: list[RecordType] = []
-    for path in sorted(directory.glob("*.yaml")):
+    for path in _declaration_paths(directory):
         document = load_yaml(path)
         _validate(path, document, "recordType")
         fields = tuple(
@@ -324,16 +382,21 @@ def _load_record_types(root: Path) -> tuple[RecordType, ...]:
                 fields=fields,
             )
         )
+    if len(types) > MAX_RECORD_TYPES:
+        raise PackError(
+            directory,
+            "record-types",
+            "record-type-limit",
+            f"a pack may declare at most {MAX_RECORD_TYPES} record types",
+        )
     return tuple(sorted(types, key=lambda t: t.order))
 
 
 def _load_recipes(root: Path, record_types: tuple[RecordType, ...]) -> dict[str, Recipe]:
     directory = root / "recipes"
-    if not directory.is_dir():
-        return {}
     known = {t.type_name for t in record_types}
     recipes: dict[str, Recipe] = {}
-    for path in sorted(directory.glob("*.yaml")):
+    for path in _declaration_paths(directory):
         document = load_yaml(path)
         _validate(path, document, "recipe")
 
@@ -366,12 +429,20 @@ def _load_recipes(root: Path, record_types: tuple[RecordType, ...]) -> dict[str,
             identifier_policy=document.get("identifier_policy"),
             emit_child_outside_window=document.get("emit_child_outside_window", True),
         )
+        _validate_record_counts(path, recipe.records)
         _validate_probability(path, "special_rate", recipe.special_rate)
         for set_name, rate in recipe.doc_mix.items():
             _validate_probability(path, f"doc_mix/{set_name}", rate)
         if recipe.name in recipes:
             raise PackError(path, "name", "duplicate-recipe", f"{recipe.name!r} declared twice")
         recipes[recipe.name] = recipe
+        if len(recipes) > MAX_RECIPES:
+            raise PackError(
+                directory,
+                "recipes",
+                "recipe-limit",
+                f"a pack may declare at most {MAX_RECIPES} recipes",
+            )
     return recipes
 
 
@@ -389,34 +460,68 @@ def _parse_instant(path: Path, location: str, text: str) -> datetime:
 
 def _load_template_sets(root: Path) -> dict[str, tuple[TemplateEntry, ...]]:
     directory = root / "templates"
-    if not directory.is_dir():
-        return {}
-    sets: dict[str, tuple[TemplateEntry, ...]] = {}
-    for path in sorted(directory.rglob("*.yaml")):
+    pending: dict[str, list[TemplateEntry]] = {}
+    for path in _declaration_paths(directory, recursive=True):
         document = load_yaml(path)
         entries = document.get("entries")
         if not isinstance(entries, list):
             raise PackError(path, "entries", "missing-entries", "a template set declares entries")
         _validate(path, entries, "templateSet")  # type: ignore[arg-type]
         name = path.parent.name if path.parent != directory else path.stem
-        sets.setdefault(name, ())
+        pending.setdefault(name, [])
         loaded_entries = tuple(
             TemplateEntry(id=e["id"], weight=e["weight"], text=e["text"]) for e in entries
         )
         _validate_weights(path, "entries/weight", [entry.weight for entry in loaded_entries])
-        sets[name] = sets[name] + loaded_entries
-    return sets
+        pending[name].extend(loaded_entries)
+        if len(pending[name]) > MAX_TEMPLATE_ENTRIES_PER_SET:
+            raise PackError(
+                path,
+                "entries",
+                "template-entry-limit",
+                f"template set {name!r} may contain at most {MAX_TEMPLATE_ENTRIES_PER_SET} entries",
+            )
+    return {name: tuple(entries) for name, entries in pending.items()}
 
 
-def _load_lexicons(root: Path) -> dict[str, Any]:
+def _load_lexicons(root: Path) -> dict[str, tuple[str, ...]]:
     directory = root / "lexicons"
-    if not directory.is_dir():
-        return {}
-    lexicons: dict[str, Any] = {}
-    for path in sorted(directory.glob("*.yaml")):
+    lexicons: dict[str, tuple[str, ...]] = {}
+    for path in _declaration_paths(directory):
         document = load_yaml(path)
         name = document.get("name", path.stem)
-        lexicons[name] = document
+        if not isinstance(name, str) or re.fullmatch(r"[a-z][a-z0-9_]*", name) is None:
+            raise PackError(path, "name", "lexicon-name", f"invalid lexicon name {name!r}")
+        if name in lexicons:
+            raise PackError(path, "name", "duplicate-lexicon", f"{name!r} declared twice")
+        unknown = set(document) - {"name", "source_note", "values"}
+        if unknown:
+            raise PackError(
+                path,
+                "document",
+                "lexicon-unknown-field",
+                f"unsupported lexicon fields: {sorted(unknown)}",
+            )
+        values = document.get("values")
+        if not isinstance(values, list) or not values:
+            raise PackError(path, "values", "lexicon-shape", "values is a non-empty list")
+        if len(values) > MAX_LEXICON_ITEMS:
+            raise PackError(
+                path,
+                "values",
+                "lexicon-item-limit",
+                f"a lexicon may contain at most {MAX_LEXICON_ITEMS} values",
+            )
+        if not all(isinstance(value, str) for value in values):
+            raise PackError(path, "values", "lexicon-value-type", "every lexicon value is a string")
+        if any(len(value) > MAX_LEXICON_VALUE_CHARS for value in values):
+            raise PackError(
+                path,
+                "values",
+                "lexicon-value-limit",
+                f"lexicon values may contain at most {MAX_LEXICON_VALUE_CHARS} characters",
+            )
+        lexicons[name] = tuple(values)
     return lexicons
 
 
@@ -425,21 +530,31 @@ def _cross_validate(
     record_types: tuple[RecordType, ...],
     recipes: dict[str, Recipe],
     template_sets: dict[str, tuple[TemplateEntry, ...]],
-    lexicons: dict[str, Any],
+    lexicons: dict[str, tuple[str, ...]],
 ) -> None:
     """The checks no single file can make about itself."""
     path = root / "fields"
 
-    orders = [t.order for t in record_types]
-    if len(set(orders)) != len(orders):
-        duplicates: list[int] = sorted({o for o in orders if orders.count(o) > 1})
+    type_names = Counter(t.type_name for t in record_types)
+    duplicate_type_names = sorted(name for name, count in type_names.items() if count > 1)
+    if duplicate_type_names:
+        raise PackError(
+            path,
+            "type_name",
+            "duplicate-record-type",
+            f"record type names declared more than once: {duplicate_type_names}",
+        )
+
+    orders = Counter(t.order for t in record_types)
+    duplicates = sorted(order for order, count in orders.items() if count > 1)
+    if duplicates:
         raise PackError(
             path, "order", "duplicate-order", f"two record types claim order {duplicates}"
         )
 
-    prefixes = [t.id_prefix for t in record_types]
-    if len(set(prefixes)) != len(prefixes):
-        duplicate_prefixes = sorted({p for p in prefixes if prefixes.count(p) > 1})
+    prefixes = Counter(t.id_prefix for t in record_types)
+    duplicate_prefixes = sorted(prefix for prefix, count in prefixes.items() if count > 1)
+    if duplicate_prefixes:
         raise PackError(
             path,
             "id_prefix",
@@ -451,9 +566,9 @@ def _cross_validate(
     order_of = {t.type_name: t.order for t in record_types}
 
     for record_type in record_types:
-        names = [f.name for f in record_type.fields]
-        if len(set(names)) != len(names):
-            duplicate_names = sorted({n for n in names if names.count(n) > 1})
+        names = Counter(f.name for f in record_type.fields)
+        duplicate_names = sorted(name for name, count in names.items() if count > 1)
+        if duplicate_names:
             raise PackError(
                 path / f"{record_type.type_name}.yaml",
                 "fields",
@@ -485,7 +600,7 @@ def _validate_field(
     known_types: set[str],
     order_of: dict[str, int],
     template_sets: dict[str, tuple[TemplateEntry, ...]],
-    lexicons: dict[str, Any],
+    lexicons: dict[str, tuple[str, ...]],
 ) -> None:
     location = f"{record_type.type_name}/{declared.name}"
     file_path = path / f"{record_type.type_name}.yaml"

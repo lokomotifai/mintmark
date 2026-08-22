@@ -9,7 +9,8 @@ import pytest
 import yaml
 
 from mintmark.engine.draws import TWO64
-from mintmark.packs.model import PackError, load_pack
+from mintmark.mint import MintError, mint
+from mintmark.packs.model import MAX_RECORDS_PER_TYPE, PackError, load_pack
 
 CONFORMANCE = Path(__file__).resolve().parents[1] / "conformance" / "pack"
 
@@ -76,3 +77,69 @@ def test_scaled_weight_total_above_u64_is_rejected_during_pack_load(tmp_path: Pa
 def test_existing_conformance_pack_stays_valid() -> None:
     loaded = load_pack(CONFORMANCE)
     assert loaded.recipe("full").records["transaction"] == 120
+    assert loaded.lexicons["ratings"] == ("0.25", "0.50", "0.75", "1.00")
+
+
+def test_recipe_record_count_is_bounded(tmp_path: Path) -> None:
+    pack = _copy_pack(tmp_path, "huge-recipe")
+    path = pack / "recipes" / "full.yaml"
+
+    def enlarge(document: dict[str, object]) -> None:
+        document["records"]["transaction"] = MAX_RECORDS_PER_TYPE + 1  # type: ignore[index]
+
+    _rewrite(path, enlarge)
+
+    with pytest.raises(PackError):
+        load_pack(pack)
+
+
+def test_runtime_record_override_uses_the_same_budget(tmp_path: Path) -> None:
+    out = tmp_path / "out"
+    with pytest.raises(MintError, match="record-count-limit"):
+        mint(
+            pack=CONFORMANCE,
+            recipe="full",
+            seed=1,
+            out=out,
+            records={"customer": MAX_RECORDS_PER_TYPE + 1},
+            invocation="pytest",
+        )
+    assert not out.exists()
+
+
+def test_pack_lexicon_rejects_structured_values_instead_of_stringifying_them(
+    tmp_path: Path,
+) -> None:
+    pack = _copy_pack(tmp_path, "structured-lexicon")
+    path = pack / "lexicons" / "ratings.yaml"
+
+    def structure(document: dict[str, object]) -> None:
+        document["values"] = [{"secret": "value"}]
+
+    _rewrite(path, structure)
+
+    with pytest.raises(PackError) as caught:
+        load_pack(pack)
+    assert caught.value.rule == "lexicon-value-type"
+
+
+def test_duplicate_record_type_name_is_rejected(tmp_path: Path) -> None:
+    pack = _copy_pack(tmp_path, "duplicate-type")
+    shutil.copy2(pack / "fields" / "customer.yaml", pack / "fields" / "duplicate.yaml")
+
+    with pytest.raises(PackError) as caught:
+        load_pack(pack)
+    assert caught.value.rule == "duplicate-record-type"
+
+
+def test_hidden_yaml_does_not_change_loaded_declarations_or_digest(tmp_path: Path) -> None:
+    pack = _copy_pack(tmp_path, "hidden-declaration")
+    before = load_pack(pack)
+    shutil.copy2(pack / "fields" / "customer.yaml", pack / "fields" / ".shadow.yaml")
+
+    after = load_pack(pack)
+
+    assert after.digest == before.digest
+    assert [item.type_name for item in after.record_types] == [
+        item.type_name for item in before.record_types
+    ]

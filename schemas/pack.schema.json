@@ -127,6 +127,7 @@
         "fields": {
           "type": "array",
           "minItems": 1,
+          "maxItems": 256,
           "items": {
             "$ref": "#/$defs/field"
           }
@@ -182,6 +183,7 @@
             "counts": {
               "type": "array",
               "minItems": 1,
+              "maxItems": 4096,
               "items": {
                 "type": "integer",
                 "minimum": 0
@@ -190,6 +192,7 @@
             "weights": {
               "type": "array",
               "minItems": 1,
+              "maxItems": 4096,
               "items": {
                 "$ref": "#/$defs/decimalString"
               }
@@ -229,9 +232,11 @@
         "records": {
           "type": "object",
           "minProperties": 1,
+          "maxProperties": 128,
           "additionalProperties": {
             "type": "integer",
-            "minimum": 0
+            "minimum": 0,
+            "maximum": 50000
           }
         },
         "date_window": {
@@ -283,6 +288,7 @@
     "templateSet": {
       "type": "array",
       "minItems": 1,
+      "maxItems": 4096,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -301,7 +307,8 @@
           },
           "text": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "maxLength": 65536
           }
         }
       }

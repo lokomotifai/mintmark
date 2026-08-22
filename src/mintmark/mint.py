@@ -21,6 +21,7 @@ interrupted mint leaves no directory that looks like a dataset.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 from datetime import UTC, datetime, timedelta
@@ -63,7 +64,14 @@ from mintmark.manifest import (
     render_sums,
 )
 from mintmark.manifest.document import SUPPORTED_PLATFORMS
-from mintmark.packs.model import Field, Pack, Recipe, RecordType, load_pack
+from mintmark.packs.model import (
+    Field,
+    Pack,
+    Recipe,
+    RecordType,
+    load_pack,
+    record_count_problem,
+)
 
 ENGINE_MAJOR = 0
 TURKEY_OFFSET = "+03:00"
@@ -196,6 +204,10 @@ def mint(
                 )
             counts[type_name] = count
         overrides["records"] = dict(sorted(records.items()))
+    count_problem = record_count_problem(counts)
+    if count_problem is not None:
+        rule, detail = count_problem
+        raise MintError(f"{rule}: {detail}")
 
     factory = StreamFactory(
         seed=seed,
@@ -270,10 +282,9 @@ class _MintContext:
             )
         return self._templates[set_name]
 
-    def lexicon_values(self, name: str) -> list[str]:
+    def lexicon_values(self, name: str) -> Sequence[str]:
         if name in self.pack.lexicons:
-            values = self.pack.lexicons[name].get("values", [])
-            return [str(v) for v in values]
+            return self.pack.lexicons[name]
         return core_lexicon(name)
 
     def generate_type(
