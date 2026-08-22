@@ -33,6 +33,18 @@ jobs:
   canary:
     name: private-corpus canary
     runs-on: ubuntu-latest
+    # GitHub does not expose repository secrets to a pull request opened by
+    # Dependabot, so the canary would arrive empty and this job would fail on
+    # every dependency bump. Skipping it there is safe and narrow: a Dependabot
+    # branch touches only the lockfile and workflow pins, it cannot introduce
+    # private corpus material into the tree, and the same tree is scanned on the
+    # push to main that follows the merge.
+    #
+    # The condition names the actor rather than testing whether the secret is
+    # empty. An empty secret in any other context must still fail: a canary check
+    # that disables itself the moment its input goes missing is worse than no
+    # check at all.
+    if: github.actor != 'dependabot[bot]'
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
