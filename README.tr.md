@@ -16,7 +16,7 @@
   <img alt="698 test" src="https://img.shields.io/badge/test-698-3C873A?style=flat-square">
   <img alt="18 invariant, her biri adlandırılmış testle" src="https://img.shields.io/badge/invariant-18%20test%20edildi-3C873A?style=flat-square">
   <a href="https://github.com/lokomotifai/mintmark/releases/tag/v0.1.0"><img alt="Sürüm v0.1.0" src="https://img.shields.io/badge/sürüm-v0.1.0-3C873A?style=flat-square"></a>
-  <img alt="Hiçbir depoya yayımlanmadı" src="https://img.shields.io/badge/PyPI-yayımlanmadı-3B3F46?style=flat-square">
+  <a href="https://pypi.org/project/mintmark/"><img alt="PyPI'de" src="https://img.shields.io/pypi/v/mintmark?style=flat-square&amp;label=PyPI&amp;color=3C873A"></a>
   <a href="LICENSE"><img alt="Apache-2.0 lisansı" src="https://img.shields.io/badge/lisans-Apache--2.0-3B3F46?style=flat-square"></a>
 </p>
 
@@ -95,9 +95,8 @@ etrafında olup bitenle ilgilenir:
 Bağımlılık kurulumundan sonra çevrimdışı. Anahtar yok, hesap yok, ağ yok.
 
 ```bash
-# Henüz PyPI'de değil, bu yüzden depodan kurun.
-uv tool install git+https://github.com/lokomotifai/mintmark
-mintmark mint --pack packs/example --recipe demo --seed 42 --out ./demo-run
+uv tool install mintmark        # veya: pip install mintmark
+mintmark mint --pack example --recipe demo --seed 42 --out ./demo-run
 mintmark verify ./demo-run
 ```
 
@@ -298,10 +297,10 @@ Sonuncusu vurgulanmayı hak eder. **Sabit bir tohum için üretilen baytları
 değiştiren bir değişiklik, hiçbir imza kımıldamasa bile ana sürüm olayıdır**,
 çünkü yayımlanmış her manifestonun yeniden üretilebilirliğini bozar.
 
-Sürüm 0.1.0 etiketlendi ve GitHub'da yayımlandı; wheel, kaynak dağıtımı ve bir
-yazılım malzeme listesi eklidir. **PyPI'a hiçbir şey yayımlanmadı**, bu yüzden
-paket adıyla değil bu depodan kurun; o dizindeki ad sahipsizdir ve onu adıyla
-çağıran bir komut bu projenin üretmediği bir şeyi kurar.
+PyPI'de [`mintmark`](https://pypi.org/project/mintmark/) olarak yayımlandı ve
+GitHub'da wheel, kaynak dağıtımı ve bir yazılım malzeme listesiyle sürüldü.
+Yayımlama, onay kapısının arkasında OIDC üzerinden güvenilir yayımlama ile
+yapılır; bu depoda uzun ömürlü hiçbir belirteç yoktur.
 
 Mintmark adı TÜRKPATENT, EUIPO, USPTO ve WIPO nezdinde marka taraması
 tamamlanana kadar geçicidir. Bu durum değişene kadar bu belge böyle söyleyecek.

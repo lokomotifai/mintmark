@@ -87,6 +87,32 @@ def schema_dir() -> Path:
     return _data_root() / "schemas"
 
 
+def packaged_pack_dir(name: str) -> Path:
+    return _data_root() / "packs" / name
+
+
+def resolve_pack(argument: str) -> Path:
+    """A path, unless it names a pack that ships inside the distribution.
+
+    The example pack is in the wheel so the quickstart works without cloning
+    anything, which is the whole reason it is shipped. Until this existed there
+    was no way to point at it: `--pack packs/example` is a path that only exists
+    in a checkout, so somebody who installed from an index followed the README
+    into an error.
+
+    A local path always wins. `example` resolves to the packaged pack only when
+    nothing of that name sits in the working directory, so this can never
+    shadow a real directory or quietly rescue a typo in a longer path.
+    """
+    candidate = Path(argument)
+    if candidate.exists():
+        return candidate
+    packaged = packaged_pack_dir(argument)
+    if (packaged / "pack.yaml").exists():
+        return packaged
+    return candidate
+
+
 @dataclass(slots=True)
 class MintSummary:
     """What a mint produced, mirroring the CLI's --json payload."""

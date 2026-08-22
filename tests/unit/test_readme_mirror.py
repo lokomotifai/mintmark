@@ -75,7 +75,7 @@ def test_each_readme_carries_the_required_blocks(path: Path) -> None:
 
     claim = text.index('<p align="center"><strong>')
     important = text.index("> [!IMPORTANT]")
-    quickstart = text.index("mintmark mint --pack packs/example")
+    quickstart = text.index("mintmark mint --pack example")
     # rindex, not index: the licence badge sits in the header block, so the first
     # occurrence of the licence name is not the licence section.
     licence = text.rindex("Apache-2.0")
@@ -114,11 +114,34 @@ def test_each_readme_states_the_determinism_claim_with_its_platforms(path: Path)
 
 
 @pytest.mark.parametrize("path", [ENGLISH, TURKISH], ids=["en", "tr"])
-def test_neither_readme_claims_a_published_package(path: Path) -> None:
-    """Nothing is published yet, and section 3.3 forbids claiming otherwise."""
-    text = path.read_text(encoding="utf-8").lower()
-    assert "pypi.org/project" not in text
-    assert "available on pypi" not in text
+def test_each_readme_points_at_the_package_that_exists(path: Path) -> None:
+    """This used to assert nothing was published, which held until something was.
+
+    Section 3.3 forbids claiming a publication that has not happened. It does not
+    forbid describing one that has, and the failure worth guarding now is the
+    opposite one: a README telling a reader to install a name that is not there.
+    """
+    text = path.read_text(encoding="utf-8")
+    assert "https://pypi.org/project/mintmark/" in text, (
+        f"{path.name} does not link the published package"
+    )
+    assert "uv tool install mintmark" in text, f"{path.name} does not show how to install it"
+    assert "git+https://github.com/lokomotifai/mintmark" not in text, (
+        f"{path.name} still installs from git, which was the workaround for not being on an index"
+    )
+
+
+@pytest.mark.parametrize("path", [ENGLISH, TURKISH], ids=["en", "tr"])
+def test_the_quickstart_uses_a_pack_a_reader_will_actually_have(path: Path) -> None:
+    """`packs/example` is a path that exists only in a checkout.
+
+    Somebody who installed from an index and followed the README hit an error,
+    which is what the packaged-pack resolver exists to prevent. The quickstart
+    has to use the form that works for them.
+    """
+    text = path.read_text(encoding="utf-8")
+    assert "--pack example" in text
+    assert "--pack packs/example" not in text
 
 
 @pytest.mark.parametrize("path", [ENGLISH, TURKISH], ids=["en", "tr"])

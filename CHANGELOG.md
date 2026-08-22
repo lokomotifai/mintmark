@@ -11,6 +11,28 @@ output for a fixed set of inputs. A change that alters emitted bytes for a fixed
 seed is a major version event even when no signature changed, because it breaks
 the reproducibility of every published manifest.
 
+## 0.1.2 - 2026-08-22
+
+### Fixed
+
+- The example pack shipped in the wheel and could not be reached. It is there so
+  the quickstart works without cloning anything, which is the whole reason it is
+  shipped, but `--pack packs/example` is a path that exists only in a checkout.
+  Anyone who installed 0.1.1 from PyPI and followed the README walked into
+  `pack: not-a-directory`. Found by installing the published package and running
+  the README's own first command against it.
+
+  `--pack example` now resolves to the packaged pack. A local path always wins,
+  so this cannot shadow a real directory, and an unrecognized name is returned
+  untouched so the loader still fails with the path the user typed rather than
+  rescuing a typo into some other pack.
+
+### Changed
+
+- Both READMEs install by package name again and the quickstart uses
+  `--pack example`. The claim that nothing was published was true until 0.1.1
+  and is not any more.
+
 ## 0.1.1 - 2026-08-22
 
 ### Added

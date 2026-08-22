@@ -33,7 +33,7 @@ from mintmark.annotate import pin_digest
 from mintmark.identifiers import CHECKSUMMED
 from mintmark.manifest import MANIFEST_FILENAME, read_manifest, verify
 from mintmark.manifest.document import comparable
-from mintmark.mint import MintError, mint, schema_dir
+from mintmark.mint import MintError, mint, resolve_pack, schema_dir
 from mintmark.packs.loader import PackError
 from mintmark.packs.model import load_pack
 
@@ -156,7 +156,7 @@ def _parse_record_overrides(pairs: list[str]) -> dict[str, int]:
 
 def _cmd_mint(args: argparse.Namespace, invocation: str) -> int:
     summary = mint(
-        pack=args.pack,
+        pack=resolve_pack(args.pack),
         recipe=args.recipe,
         seed=args.seed,
         out=args.out,
@@ -286,7 +286,7 @@ def _locate_pack(directory: Path, name: str) -> Path | None:
 
 
 def _cmd_packcheck(args: argparse.Namespace) -> int:
-    pack_root = Path(args.pack)
+    pack_root = resolve_pack(args.pack)
     loaded = load_pack(pack_root)
 
     problems: list[str] = []
@@ -353,7 +353,7 @@ def _cmd_packcheck(args: argparse.Namespace) -> int:
 
 
 def _cmd_inspect(args: argparse.Namespace) -> int:
-    loaded = load_pack(Path(args.pack))
+    loaded = load_pack(resolve_pack(args.pack))
     payload = {
         "name": loaded.name,
         "version": loaded.version,

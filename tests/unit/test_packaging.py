@@ -106,3 +106,56 @@ def test_the_sbom_lists_the_runtime_dependencies() -> None:
     assert document["bomFormat"] == "CycloneDX"
     names = {component["name"].lower() for component in document["components"]}
     assert {"jsonschema", "pyyaml"} <= names
+
+
+# Reaching the pack that ships inside the distribution.
+
+
+def test_the_packaged_example_resolves_by_name() -> None:
+    """It ships so the quickstart works without cloning, which needs a way in.
+
+    Until this resolver existed the data was in the wheel and unreachable:
+    `--pack packs/example` is a path that only exists in a checkout, so anyone
+    who installed from an index followed the README straight into an error.
+    """
+    from mintmark.mint import packaged_pack_dir, resolve_pack
+
+    resolved = resolve_pack("example")
+    assert resolved == packaged_pack_dir("example")
+    assert (resolved / "pack.yaml").exists()
+
+
+def test_a_local_path_always_wins_over_the_packaged_name(tmp_path: Path, monkeypatch) -> None:
+    """Otherwise a directory called `example` would be silently ignored."""
+    from mintmark.mint import resolve_pack
+
+    local = tmp_path / "example"
+    local.mkdir()
+    monkeypatch.chdir(tmp_path)
+    assert resolve_pack("example") == Path("example")
+
+
+def test_an_unknown_name_is_returned_unchanged(tmp_path: Path, monkeypatch) -> None:
+    """The resolver must not rescue a typo into some other pack.
+
+    Returning the argument untouched lets the loader fail with the path the user
+    actually typed, which is the error they can act on.
+    """
+    from mintmark.mint import resolve_pack
+
+    monkeypatch.chdir(tmp_path)
+    assert resolve_pack("exampel") == Path("exampel")
+    assert resolve_pack("packs/example") == Path("packs/example")
+
+
+def test_the_quickstart_command_runs_against_the_packaged_pack(tmp_path: Path) -> None:
+    """The README's first command, executed rather than assumed."""
+    from mintmark.cli import main
+
+    out = tmp_path / "demo-run"
+    assert (
+        main(["mint", "--pack", "example", "--recipe", "demo", "--seed", "42", "--out", str(out)])
+        == 0
+    )
+    assert (out / "MINTMARK.json").exists()
+    assert main(["verify", str(out)]) == 0

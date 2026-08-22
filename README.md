@@ -16,7 +16,7 @@
   <img alt="698 tests" src="https://img.shields.io/badge/tests-698-3C873A?style=flat-square">
   <img alt="18 invariants, each with a named test" src="https://img.shields.io/badge/invariants-18%20tested-3C873A?style=flat-square">
   <a href="https://github.com/lokomotifai/mintmark/releases/tag/v0.1.0"><img alt="Release v0.1.0" src="https://img.shields.io/badge/release-v0.1.0-3C873A?style=flat-square"></a>
-  <img alt="Not published to any registry" src="https://img.shields.io/badge/PyPI-not%20published-3B3F46?style=flat-square">
+  <a href="https://pypi.org/project/mintmark/"><img alt="On PyPI" src="https://img.shields.io/pypi/v/mintmark?style=flat-square&amp;label=PyPI&amp;color=3C873A"></a>
   <a href="LICENSE"><img alt="Apache-2.0 license" src="https://img.shields.io/badge/license-Apache--2.0-3B3F46?style=flat-square"></a>
 </p>
 
@@ -95,9 +95,8 @@ what happens around that:
 Offline after dependency bootstrap. No keys, no accounts, no network.
 
 ```bash
-# Not on PyPI yet, so install from the repository.
-uv tool install git+https://github.com/lokomotifai/mintmark
-mintmark mint --pack packs/example --recipe demo --seed 42 --out ./demo-run
+uv tool install mintmark        # or: pip install mintmark
+mintmark mint --pack example --recipe demo --seed 42 --out ./demo-run
 mintmark verify ./demo-run
 ```
 
@@ -296,11 +295,10 @@ That last one deserves emphasis. **A change that alters emitted bytes for a fixe
 seed is a major version event even when no signature moved**, because it breaks
 the reproducibility of every published manifest.
 
-Version 0.1.0 is tagged and released on GitHub with the wheel, the source
-distribution, and a software bill of materials attached. **Nothing is published to
-PyPI**, so install from this repository rather than by package name; the name on
-that index is unclaimed and a command naming it there installs something this
-project did not build.
+Published on PyPI as [`mintmark`](https://pypi.org/project/mintmark/), and
+released on GitHub with the wheel, the source distribution, and a software bill
+of materials attached. Publication runs through trusted publishing over OIDC
+behind an approval gate, so no long-lived token exists in this repository.
 
 The name Mintmark is provisional pending trademark screening at TURKPATENT,
 EUIPO, USPTO, and WIPO. This README will say so until that changes.
