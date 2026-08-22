@@ -146,7 +146,7 @@ def test_turkish_characters_do_not_shift_offsets() -> None:
 
 @pytest.mark.parametrize(("start", "end"), [(-1, 5), (5, 5), (6, 5)])
 def test_malformed_span_bounds_are_refused(start: int, end: int) -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"non-negative|non-empty"):
         Span(start=start, end=end, label=Label.PERSON)
 
 
@@ -178,13 +178,15 @@ def test_sidecar_carries_a_digest_rather_than_the_document_text() -> None:
 def test_verify_alignment_reports_a_span_past_the_end() -> None:
     record = SidecarRecord("D1", "short", (Span(0, 99, Label.PERSON),))
     problems = verify_alignment(record)
-    assert problems and "runs past the end" in problems[0]
+    assert problems
+    assert "runs past the end" in problems[0]
 
 
 def test_verify_alignment_reports_overlapping_spans() -> None:
     record = SidecarRecord("D1", "abcdefghij", (Span(0, 6, Label.PERSON), Span(4, 9, Label.ORG)))
     problems = verify_alignment(record)
-    assert problems and "overlap" in problems[0]
+    assert problems
+    assert "overlap" in problems[0]
 
 
 def test_verify_alignment_reports_every_fault_not_only_the_first() -> None:

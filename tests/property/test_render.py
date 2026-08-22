@@ -1,4 +1,3 @@
-# ruff: noqa: RUF001
 """Rendering places spans as it writes, and every span re-extracts.
 
 The alternative implementation, searching the finished text for each value, is

@@ -69,7 +69,7 @@ BANNED_TERMS: dict[str, str] = {
     "en ileri": "tr",
     "yeni nesil": "tr",
     "akilli": "tr",
-    "akıllı": "tr",  # noqa: RUF001
+    "akıllı": "tr",
     "oyun degistirici": "tr",
     "oyun değiştirici": "tr",
     "guclu": "tr",

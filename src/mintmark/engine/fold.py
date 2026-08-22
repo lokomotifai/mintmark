@@ -1,4 +1,3 @@
-# ruff: noqa: RUF001, RUF002
 """Turkish case and diacritic folding, with length preserved exactly.
 
 `str.lower()` is wrong for Turkish twice over. It maps `I` to `i` where Turkish

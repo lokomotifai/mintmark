@@ -1,4 +1,3 @@
-# ruff: noqa: RUF001
 """Folding preserves length, and every address stays inside reserved names.
 
 The length property is not cosmetic. Label spans are code point offsets into the

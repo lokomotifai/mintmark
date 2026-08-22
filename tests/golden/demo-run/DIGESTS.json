@@ -1,0 +1,12 @@
+{
+  "_note": "Golden output of: mintmark mint --pack packs/example --recipe demo --seed 42. A change here means emitted bytes moved for a fixed seed, which breaks the reproducibility of every published manifest and is a major version event. Do not update these to make a test pass.",
+  "pack": "mintmark-example",
+  "recipe": "demo",
+  "seed": "42",
+  "identifier_policy": "safe",
+  "digests": {
+    "customer.jsonl": "f968b01fcef05728dd86393d827f43e81d92548ecbab5ac015382cb4f807d2d5",
+    "transaction.jsonl": "a07418173ee0dc3803a02e63aaafe5e3abc1217d0b77af248cc1af505ac19104",
+    "transaction.labels.jsonl": "75899bb6060578e41e9d94c29adecb10a75ce41fce0afdb5bb8966550199cff8"
+  }
+}

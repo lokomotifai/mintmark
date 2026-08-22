@@ -132,5 +132,5 @@ def test_core_range_membership(text: str, version: str, expected: bool) -> None:
 
 @pytest.mark.parametrize("bad", [">=0.1", "<0.2", "0.1", ">=0.2,<0.1", "any", ""])
 def test_malformed_core_ranges_are_refused(bad: str) -> None:
-    with pytest.raises(ValueError, match="closed upper bound|empty range"):
+    with pytest.raises(ValueError, match=r"closed upper bound|empty range"):
         parse_range(bad)

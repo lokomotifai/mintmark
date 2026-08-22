@@ -22,6 +22,8 @@ __pycache__/
 # OS
 .DS_Store
 
-# Minted output directories produced during development
-demo-run/
-*-run/
+# Minted output directories produced during development. Anchored to the root:
+# an unanchored pattern also swallowed tests/golden/demo-run, which is committed
+# reference output and the only proof that emitted bytes have not moved.
+/demo-run/
+/*-run/

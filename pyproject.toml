@@ -94,6 +94,12 @@ ignore = [
   "SIM108",
 ]
 
+# Turkish letters are this project's subject matter, not a homoglyph attack. The
+# dotless i and the rest appear in lexicons, test fixtures, and the fold table
+# that exists precisely because they behave differently from their ASCII
+# lookalikes. Flagging them everywhere would mean a noqa on almost every file.
+allowed-confusables = ["ı", "İ", "ş", "Ş", "ğ", "Ğ", "ü", "Ü", "ö", "Ö", "ç", "Ç", "â", "î", "û"]
+
 [tool.ruff.lint.flake8-tidy-imports]
 # Dynamic imports are forbidden in src/ so that the dependency graph stays
 # statically checkable by import-linter (PLAN.md section 11).
