@@ -34,7 +34,8 @@ layers =
 ; activated by the milestone that creates its source module:
 ;
 ;     engine-is-stdlib-only   WP-01  ACTIVE
-;     leaf-modules-narrow     WP-03 (identifiers), WP-04 (annotate), WP-06 (packs)
+;     identifiers-narrow      WP-03  ACTIVE
+;     leaf-modules-narrow     WP-04 (annotate), WP-06 (packs)
 ;     emit-narrow             WP-09
 ;     manifest-narrow         WP-10
 ;
@@ -78,6 +79,17 @@ allow_indirect_imports = False
 ;     mintmark.identifiers
 ;     mintmark.packs
 ; allow_indirect_imports = False
+
+[importlinter:contract:identifiers-narrow]
+name = identifiers imports only engine
+type = forbidden
+source_modules =
+    mintmark.identifiers
+forbidden_modules =
+    mintmark.cli
+    mintmark.manifest
+    mintmark.emit
+allow_indirect_imports = False
 
 ; [importlinter:contract:leaf-modules-narrow]
 ; name = packs, identifiers and annotate import only engine

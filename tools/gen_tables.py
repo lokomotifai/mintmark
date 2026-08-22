@@ -100,7 +100,7 @@ def inverse_cdf_knots(spec: LogNormalSpec) -> list[int]:
         probability = (index + 0.5) / KNOTS
         # Inverse CDF of the log-normal: exp(mu + sigma * probit(p)).
         quantile = math.exp(spec.mu + spec.sigma * _probit(probability))
-        value = int(round(quantile))
+        value = round(quantile)
         knots.append(max(spec.minimum_kurus, min(spec.maximum_kurus, value)))
     return knots
 
