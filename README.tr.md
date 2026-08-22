@@ -206,9 +206,9 @@ dışında hiçbir şeyi içe aktarmaz.
 | Depo | Durum | İçerik |
 | --- | --- | --- |
 | **mintmark** | bu depo | üretim, tanımlayıcılar, etiketleme, manifestolar, CLI, bir örnek paket |
-| **mintmark-banking** | birinci kol | müşteriler, hesaplar, kartlar, işlemler, şikâyetler, KYC notları, destek dökümleri |
-| **mintmark-insurance** | ikinci kol | poliçe sahipleri, poliçeler, hasarlar, ödemeler, hasar notları, çağrı dökümleri |
-| **mintmark-hr** | üçüncü kol | çalışanlar, pozisyon geçmişi, izin, bordro, performans ve işe alım notları, İK talepleri |
+| **[mintmark-banking](https://github.com/lokomotifai/mintmark-banking)** | birinci kol | müşteriler, hesaplar, kartlar, işlemler, şikâyetler, KYC notları, destek dökümleri |
+| **[mintmark-insurance](https://github.com/lokomotifai/mintmark-insurance)** | ikinci kol | poliçe sahipleri, poliçeler, hasarlar, ödemeler, hasar notları, çağrı dökümleri |
+| **[mintmark-hr](https://github.com/lokomotifai/mintmark-hr)** | üçüncü kol | çalışanlar, pozisyon geçmişi, izin, bordro, performans ve işe alım notları, İK talepleri |
 | sağlık | ertelendi | Özel nitelikli veri yoğunluğu, brief yazılmadan önce daha sıkı bir yönetişim incelemesi ister |
 
 Her paket bu motoru kapalı üst sınırlı bir sürüm aralığıyla sabitler; böylece

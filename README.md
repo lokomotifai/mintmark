@@ -205,9 +205,9 @@ tests and imports nothing beyond the public API.
 | Repository | Status | Contents |
 | --- | --- | --- |
 | **mintmark** | this repository | generation, identifiers, annotation, manifests, the CLI, one example fixture pack |
-| **mintmark-banking** | first spoke | customers, accounts, cards, transactions, complaints, KYC notes, support transcripts |
-| **mintmark-insurance** | second spoke | policyholders, policies, claims, payments, claim notes, call transcripts |
-| **mintmark-hr** | third spoke | employees, position history, leave, payroll, performance and recruiter notes, HR requests |
+| **[mintmark-banking](https://github.com/lokomotifai/mintmark-banking)** | first spoke | customers, accounts, cards, transactions, complaints, KYC notes, support transcripts |
+| **[mintmark-insurance](https://github.com/lokomotifai/mintmark-insurance)** | second spoke | policyholders, policies, claims, payments, claim notes, call transcripts |
+| **[mintmark-hr](https://github.com/lokomotifai/mintmark-hr)** | third spoke | employees, position history, leave, payroll, performance and recruiter notes, HR requests |
 | health | deferred | Its special-category density needs a stricter governance review before a brief is even written |
 
 Each pack pins this engine by a version range with a closed upper bound, so a
