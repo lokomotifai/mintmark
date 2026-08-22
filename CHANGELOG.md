@@ -11,6 +11,50 @@ output for a fixed set of inputs. A change that alters emitted bytes for a fixed
 seed is a major version event even when no signature changed, because it breaks
 the reproducibility of every published manifest.
 
+## 0.1.3 - 2026-08-22
+
+### Fixed, and it changes every manifest
+
+- **The pack digest covered files that cannot affect what a pack emits.** It
+  enumerated the whole pack directory minus a short denylist, which meant it
+  covered README files, the changelog, the test suite, the lockfile, the vendored
+  engine wheel, compiled `__pycache__` output, and `PLAN.md`, a file the sector
+  packs deliberately keep out of git.
+
+  Three consequences, all observed rather than reasoned about. A clean clone and
+  a working checkout of the same commit produced different digests. Running the
+  suite under a different pytest version changed the digest through the `.pyc`
+  files. Editing documentation changed the digest of a pack whose declarations
+  had not moved. One pack produced three different digests for one set of
+  declarations: `9548e8fd` in a working tree, `144b703a` from a clean clone, and
+  `a9552d15` in an already published dataset.
+
+  A digest behaving that way cannot do the job it exists for, which is to let
+  somebody holding a dataset tell whether a pack they have is the pack it came
+  from. It now covers `pack.yaml` and the `fields/`, `recipes/`, `templates/`,
+  `lexicons/`, and `assets/` directories, by allowlist rather than denylist,
+  because every failure above was something nobody thought to deny.
+
+  Every manifest this engine writes now records a different `pack.digest` for the
+  same declarations. No emitted data moves: the digest seeds nothing.
+
+- **`reproduce` could not find the pack the engine itself ships**, so the
+  quickstart's own output could not be reproduced by the command the README
+  advertises as the check that makes a manifest mean something.
+
+- **`reproduce` reported `differs outside the excluded provenance block`**, which
+  was true and useless. It now names each field that differs with both values. A
+  difference confined to the engine version is reported as what it is rather than
+  as a mismatch, because the determinism claim covers a fixed engine version and
+  a newer engine reproducing every byte is a stronger result than the claim, not
+  a failure of it.
+
+### Notes
+
+Found by auditing the published product rather than the source tree: cloning the
+packs, installing the engine from PyPI, and running the documented commands
+against the released datasets.
+
 ## 0.1.2 - 2026-08-22
 
 ### Fixed
@@ -154,6 +198,8 @@ TCMB list. Each record, with its source and retrieval date, is in
 
 ### Notes
 
-No release has been published. Nothing exists on any package registry, and
-nothing in this file should be read as a claim that an installable artifact is
-available. The name Mintmark is provisional pending trademark screening.
+Nothing was published at the time 0.1.0 was cut: no package registry carried it
+and the name was still provisional. Both changed later the same day, in 0.1.1 and
+in the trademark clearance recorded in TRADEMARKS.md. This note is left as it was
+written rather than edited, because a changelog that quietly updates itself stops
+being a record.

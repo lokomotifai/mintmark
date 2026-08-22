@@ -13,9 +13,9 @@
 
 <p align="center">
   <a href="https://github.com/lokomotifai/mintmark/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/lokomotifai/mintmark/ci.yml?branch=main&amp;style=flat-square&amp;label=CI"></a>
-  <img alt="698 tests" src="https://img.shields.io/badge/tests-698-3C873A?style=flat-square">
+  <img alt="804 tests" src="https://img.shields.io/badge/tests-804-3C873A?style=flat-square">
   <img alt="18 invariants, each with a named test" src="https://img.shields.io/badge/invariants-18%20tested-3C873A?style=flat-square">
-  <a href="https://github.com/lokomotifai/mintmark/releases/tag/v0.1.2"><img alt="Release v0.1.2" src="https://img.shields.io/badge/release-v0.1.2-3C873A?style=flat-square"></a>
+  <a href="https://github.com/lokomotifai/mintmark/releases/tag/v0.1.3"><img alt="Release v0.1.3" src="https://img.shields.io/badge/release-v0.1.3-3C873A?style=flat-square"></a>
   <a href="https://pypi.org/project/mintmark/"><img alt="On PyPI" src="https://img.shields.io/pypi/v/mintmark?style=flat-square&amp;label=PyPI&amp;color=3C873A"></a>
   <a href="LICENSE"><img alt="Apache-2.0 license" src="https://img.shields.io/badge/license-Apache--2.0-3B3F46?style=flat-square"></a>
 </p>
@@ -56,11 +56,10 @@ coin to say where it was made. A Mintmark dataset carries the same thing in its
 manifest, so a dataset that turns up six months later can still say what produced
 it.
 
-**Version 0.1, pre-release. Nothing is published to any package registry, and
-nothing here claims otherwise.** The name is provisional pending trademark
-screening. What is true today: 698 tests pass, all eighteen invariants have named
-tests, and the byte-level determinism claim is observed on three platforms in a
-single CI run rather than asserted from one.
+**Published as [`mintmark`](https://pypi.org/project/mintmark/) on PyPI.** 804
+tests pass, all eighteen invariants have named tests, and the byte-level
+determinism claim is observed on three platforms in a single CI run rather than
+asserted from one.
 
 > [!IMPORTANT]
 > **What Mintmark is not.** It is not anonymization or masking of real data; it
@@ -300,8 +299,8 @@ released on GitHub with the wheel, the source distribution, and a software bill
 of materials attached. Publication runs through trusted publishing over OIDC
 behind an approval gate, so no long-lived token exists in this repository.
 
-The name Mintmark is provisional pending trademark screening at TURKPATENT,
-EUIPO, USPTO, and WIPO. This README will say so until that changes.
+The name is frozen. Trademark screening cleared on 2026-08-22, and the PyPI
+namespace is held by the project.
 
 ## Community contract
 

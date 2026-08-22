@@ -13,6 +13,8 @@ import pytest
 
 from mintmark.packs.digest import canonical_lines, enumerate_files, pack_digest
 
+CONFORMANCE = Path(__file__).resolve().parents[1] / "conformance" / "pack"
+
 
 @pytest.fixture
 def pack(tmp_path: Path) -> Path:
@@ -110,3 +112,88 @@ def test_two_packs_with_identical_content_share_a_digest(tmp_path: Path) -> None
         root.mkdir()
         (root / "pack.yaml").write_text("name: mintmark-fixture\n", encoding="utf-8")
     assert pack_digest(tmp_path / "a") == pack_digest(tmp_path / "b")
+
+
+# What the digest covers, and the three ways the old boundary failed.
+
+
+def test_the_digest_is_the_same_from_a_clean_clone_and_a_working_checkout(
+    tmp_path: Path,
+) -> None:
+    """It used to depend on files a clone does not have.
+
+    A working checkout carries untracked things a clean clone does not: compiled
+    caches, a local plan file, a built virtual environment. When the digest
+    covered the whole directory, two people on the same commit computed different
+    digests, and neither matched the one a published dataset recorded.
+    """
+    import shutil
+
+    from mintmark.packs.digest import pack_digest
+
+    clean = tmp_path / "clean"
+    shutil.copytree(CONFORMANCE, clean)
+    working = tmp_path / "working"
+    shutil.copytree(CONFORMANCE, working)
+
+    (working / "PLAN.md").write_text("a local file kept out of git\n", encoding="utf-8")
+    (working / "NOTES.txt").write_text("scratch\n", encoding="utf-8")
+    cache = working / "tests" / "__pycache__"
+    cache.mkdir(parents=True)
+    (cache / "test_thing.cpython-312.pyc").write_bytes(b"\x00compiled\x00")
+    (working / "uv.lock").write_text("version = 1\n", encoding="utf-8")
+
+    assert pack_digest(clean) == pack_digest(working), (
+        "untracked and generated files still reach the digest"
+    )
+
+
+def test_documentation_does_not_move_the_digest(tmp_path: Path) -> None:
+    """A README edit is not a change to what a pack emits."""
+    import shutil
+
+    from mintmark.packs.digest import pack_digest
+
+    pack = tmp_path / "pack"
+    shutil.copytree(CONFORMANCE, pack)
+    before = pack_digest(pack)
+    (pack / "README.md").write_text("# Rewritten\n\nEntirely different prose.\n", encoding="utf-8")
+    (pack / "CHANGELOG.md").write_text("# Changelog\n", encoding="utf-8")
+    assert pack_digest(pack) == before
+
+
+def test_a_declaration_does_move_the_digest(tmp_path: Path) -> None:
+    """Narrowing the boundary must not have narrowed it into uselessness."""
+    import shutil
+
+    from mintmark.packs.digest import pack_digest
+
+    pack = tmp_path / "pack"
+    shutil.copytree(CONFORMANCE, pack)
+    before = pack_digest(pack)
+
+    manifest = pack / "pack.yaml"
+    manifest.write_text(
+        manifest.read_text(encoding="utf-8").replace("version: 0.1.0", "version: 0.2.0"),
+        encoding="utf-8",
+    )
+    assert pack_digest(pack) != before, "a pack.yaml change did not move the digest"
+
+    shutil.rmtree(pack)
+    shutil.copytree(CONFORMANCE, pack)
+    template = next((pack / "templates").rglob("*.yaml"))
+    template.write_text(template.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+    assert pack_digest(pack) != before, "a template change did not move the digest"
+
+
+def test_every_directory_the_loader_reads_is_inside_the_digest() -> None:
+    """The allowlist and the loader must not drift apart.
+
+    If the loader learns to read a new directory and this list does not, a pack
+    could change what it emits without changing its digest, which is the failure
+    the digest exists to make impossible.
+    """
+    from mintmark.packs.digest import DECLARATIVE_DIRECTORIES, DECLARATIVE_FILES
+
+    assert "pack.yaml" in DECLARATIVE_FILES
+    assert {"fields", "recipes", "templates", "lexicons"} <= DECLARATIVE_DIRECTORIES

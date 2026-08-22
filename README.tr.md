@@ -13,9 +13,9 @@
 
 <p align="center">
   <a href="https://github.com/lokomotifai/mintmark/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/lokomotifai/mintmark/ci.yml?branch=main&amp;style=flat-square&amp;label=CI"></a>
-  <img alt="698 test" src="https://img.shields.io/badge/test-698-3C873A?style=flat-square">
+  <img alt="804 test" src="https://img.shields.io/badge/test-804-3C873A?style=flat-square">
   <img alt="18 invariant, her biri adlandırılmış testle" src="https://img.shields.io/badge/invariant-18%20test%20edildi-3C873A?style=flat-square">
-  <a href="https://github.com/lokomotifai/mintmark/releases/tag/v0.1.2"><img alt="Sürüm v0.1.2" src="https://img.shields.io/badge/sürüm-v0.1.2-3C873A?style=flat-square"></a>
+  <a href="https://github.com/lokomotifai/mintmark/releases/tag/v0.1.3"><img alt="Sürüm v0.1.3" src="https://img.shields.io/badge/sürüm-v0.1.3-3C873A?style=flat-square"></a>
   <a href="https://pypi.org/project/mintmark/"><img alt="PyPI'de" src="https://img.shields.io/pypi/v/mintmark?style=flat-square&amp;label=PyPI&amp;color=3C873A"></a>
   <a href="LICENSE"><img alt="Apache-2.0 lisansı" src="https://img.shields.io/badge/lisans-Apache--2.0-3B3F46?style=flat-square"></a>
 </p>
@@ -56,9 +56,8 @@ basıldığını söylemek için vurduğu küçük harftir. Bir Mintmark veri k�
 şeyi manifestosunda taşır; böylece altı ay sonra ortaya çıkan bir veri kümesi
 kendisini neyin ürettiğini hâlâ söyleyebilir.
 
-**Sürüm 0.1, ön yayın. Hiçbir paket deposuna yayın yapılmamıştır ve burada aksini
-iddia eden hiçbir şey yoktur.** Ad, marka taraması tamamlanana kadar geçicidir.
-Bugün doğru olan: 698 test geçiyor, on sekiz invariant'ın hepsinin adlandırılmış
+**PyPI'de [`mintmark`](https://pypi.org/project/mintmark/) olarak
+yayımlanmıştır.** 804 test geçiyor, on sekiz invariant'ın hepsinin adlandırılmış
 testi var ve bayt düzeyindeki determinizm iddiası tek bir platformdan varsayılmak
 yerine tek bir CI koşusunda üç platformda gözlemleniyor.
 
@@ -302,8 +301,8 @@ GitHub'da wheel, kaynak dağıtımı ve bir yazılım malzeme listesiyle sürül
 Yayımlama, onay kapısının arkasında OIDC üzerinden güvenilir yayımlama ile
 yapılır; bu depoda uzun ömürlü hiçbir belirteç yoktur.
 
-Mintmark adı TÜRKPATENT, EUIPO, USPTO ve WIPO nezdinde marka taraması
-tamamlanana kadar geçicidir. Bu durum değişene kadar bu belge böyle söyleyecek.
+Ad donduruldu. Marka taraması 2026-08-22'de temiz sonuçlandı ve PyPI ad alanı
+proje tarafından tutuluyor.
 
 ## Topluluk sözleşmesi
 

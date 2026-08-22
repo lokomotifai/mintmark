@@ -33,7 +33,7 @@ from mintmark.annotate import pin_digest
 from mintmark.identifiers import CHECKSUMMED
 from mintmark.manifest import MANIFEST_FILENAME, read_manifest, verify
 from mintmark.manifest.document import comparable
-from mintmark.mint import MintError, mint, resolve_pack, schema_dir
+from mintmark.mint import MintError, mint, packaged_pack_dir, resolve_pack, schema_dir
 from mintmark.packs.loader import PackError
 from mintmark.packs.model import load_pack
 
@@ -238,20 +238,63 @@ def _cmd_reproduce(args: argparse.Namespace) -> int:
                 differences.append(f"{name}: bytes differ from the recorded mint")
 
         fresh_manifest = json.loads((replica / MANIFEST_FILENAME).read_text(encoding="utf-8"))
-        if comparable(fresh_manifest) != comparable(document):
-            differences.append(
-                f"{MANIFEST_FILENAME}: differs outside the excluded provenance block"
+        drift = _manifest_drift(comparable(document), comparable(fresh_manifest))
+        # The engine version is the one field that can differ while every byte
+        # the determinism claim covers still matches, because the claim is about
+        # a fixed engine version rather than about all of them. Reporting that as
+        # a mismatch tells somebody their sound dataset is broken.
+        engine_only = set(drift) == {"mintmark.engine_version"}
+        if drift and not engine_only:
+            differences.extend(
+                f"{MANIFEST_FILENAME}: {path}: {a!r} against {b!r}"
+                for path, (a, b) in sorted(drift.items())
             )
 
-    payload = {"ok": not differences, "directory": str(directory), "problems": differences}
+    payload: dict[str, Any] = {
+        "ok": not differences,
+        "directory": str(directory),
+        "problems": differences,
+    }
+    if engine_only and not differences:
+        recorded, running = drift["mintmark.engine_version"]
+        note = (
+            f"data files are byte-identical, and were produced by engine "
+            f"{recorded} rather than the {running} running here. The determinism "
+            f"claim covers a fixed engine version, so this confirms the bytes "
+            f"rather than the claim."
+        )
+        payload["note"] = note
     if args.json:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     elif differences:
         for line in differences:
             print(f"MISMATCH: {line}", file=sys.stderr)
+    elif payload.get("note"):
+        print("reproduce: byte-identical")
+        print(f"NOTE: {payload['note']}")
     else:
         print("reproduce: byte-identical")
     return EXIT_OK if not differences else EXIT_REPRODUCE_MISMATCH
+
+
+def _manifest_drift(recorded: dict[str, Any], fresh: dict[str, Any]) -> dict[str, tuple[Any, Any]]:
+    """Every leaf that differs, by dotted path.
+
+    `differs outside the excluded provenance block` was true and useless: it told
+    a consumer that something was wrong without telling them what, which is the
+    shape of message people learn to ignore.
+    """
+    drift: dict[str, tuple[Any, Any]] = {}
+
+    def walk(left: Any, right: Any, path: str) -> None:
+        if isinstance(left, dict) and isinstance(right, dict):
+            for key in sorted(set(left) | set(right)):
+                walk(left.get(key), right.get(key), f"{path}.{key}" if path else key)
+        elif left != right:
+            drift[path] = (left, right)
+
+    walk(recorded, fresh, "")
+    return drift
 
 
 def _format_of(document: dict[str, Any]) -> str:
@@ -274,6 +317,11 @@ def _locate_pack(directory: Path, name: str) -> Path | None:
         Path.cwd() / name,
         Path.cwd() / "packs" / name.removeprefix("mintmark-"),
         Path.cwd(),
+        # The engine ships the example pack, so a dataset minted from it can be
+        # reproduced without cloning anything. Without this, the quickstart's own
+        # output could not be reproduced by the tool that advertises reproduce as
+        # the check that makes a manifest mean something.
+        packaged_pack_dir(name.removeprefix("mintmark-")),
     ]
     for candidate in candidates:
         if (candidate / "pack.yaml").exists():
