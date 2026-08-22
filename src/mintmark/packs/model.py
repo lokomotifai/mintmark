@@ -22,16 +22,19 @@ import json
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
 import jsonschema
 
+from mintmark.engine.draws import TWO64
 from mintmark.packs.digest import pack_digest
 from mintmark.packs.loader import PackError, load_yaml
 from mintmark.packs.semver import CoreRange, parse_range
 
 SCHEMA_FILENAME = "pack.schema.json"
+MAX_DECIMAL_PLACES = 19
 
 
 def _schema_root() -> Path:
@@ -180,6 +183,63 @@ def _validate(path: Path, document: dict[str, Any], definition: str | None = Non
         raise PackError(path, location, "schema", first.message)
 
 
+def _decimal(
+    path: Path,
+    location: str,
+    raw: str,
+    *,
+    probability: bool = False,
+) -> Decimal:
+    """Parse one pack decimal under the sampler's finite-domain contract."""
+    try:
+        value = Decimal(raw)
+    except (InvalidOperation, ValueError) as exc:
+        raise PackError(path, location, "invalid-decimal", f"{raw!r} is not a decimal") from exc
+    if not value.is_finite():
+        raise PackError(path, location, "invalid-decimal", f"{raw!r} is not finite")
+    exponent = value.as_tuple().exponent
+    places = max(0, -exponent) if isinstance(exponent, int) else MAX_DECIMAL_PLACES + 1
+    if places > MAX_DECIMAL_PLACES:
+        raise PackError(
+            path,
+            location,
+            "decimal-precision-limit",
+            f"{raw!r} has {places} decimal places; at most {MAX_DECIMAL_PLACES} are supported",
+        )
+    if probability and not Decimal(0) <= value <= Decimal(1):
+        raise PackError(path, location, "probability-out-of-range", f"{raw!r} is not in [0, 1]")
+    return value
+
+
+def _decimal_places(value: Decimal) -> int:
+    exponent = value.as_tuple().exponent
+    if not isinstance(exponent, int):
+        return MAX_DECIMAL_PLACES + 1
+    return max(0, -exponent)
+
+
+def _validate_weights(path: Path, location: str, weights: tuple[str, ...] | list[str]) -> None:
+    values = [_decimal(path, f"{location}/{index}", raw) for index, raw in enumerate(weights)]
+    if any(value < 0 for value in values):
+        raise PackError(path, location, "negative-weight", "weights must not be negative")
+    places = max((_decimal_places(value) for value in values), default=0)
+    factor = Decimal(10) ** places
+    total = sum(int(value * factor) for value in values)
+    if total <= 0:
+        raise PackError(path, location, "zero-weight-total", "weights must sum to a positive value")
+    if total > TWO64:
+        raise PackError(
+            path,
+            location,
+            "sampler-domain-limit",
+            f"scaled weight total {total} exceeds the 64-bit sampler domain",
+        )
+
+
+def _validate_probability(path: Path, location: str, raw: str) -> None:
+    _decimal(path, location, raw, probability=True)
+
+
 def load_pack(root: Path, *, core_version: str | None = None) -> Pack:
     """Load and cross-validate a pack directory."""
     root = Path(root)
@@ -306,6 +366,9 @@ def _load_recipes(root: Path, record_types: tuple[RecordType, ...]) -> dict[str,
             identifier_policy=document.get("identifier_policy"),
             emit_child_outside_window=document.get("emit_child_outside_window", True),
         )
+        _validate_probability(path, "special_rate", recipe.special_rate)
+        for set_name, rate in recipe.doc_mix.items():
+            _validate_probability(path, f"doc_mix/{set_name}", rate)
         if recipe.name in recipes:
             raise PackError(path, "name", "duplicate-recipe", f"{recipe.name!r} declared twice")
         recipes[recipe.name] = recipe
@@ -337,9 +400,11 @@ def _load_template_sets(root: Path) -> dict[str, tuple[TemplateEntry, ...]]:
         _validate(path, entries, "templateSet")  # type: ignore[arg-type]
         name = path.parent.name if path.parent != directory else path.stem
         sets.setdefault(name, ())
-        sets[name] = sets[name] + tuple(
+        loaded_entries = tuple(
             TemplateEntry(id=e["id"], weight=e["weight"], text=e["text"]) for e in entries
         )
+        _validate_weights(path, "entries/weight", [entry.weight for entry in loaded_entries])
+        sets[name] = sets[name] + loaded_entries
     return sets
 
 
@@ -451,6 +516,7 @@ def _validate_field(
                 "ref-shape-mismatch",
                 f"{len(declared.ref.counts)} counts against {len(declared.ref.weights)} weights",
             )
+        _validate_weights(file_path, f"{location}/ref/weights", declared.ref.weights)
     elif declared.ref is not None:
         raise PackError(
             file_path, location, "ref-on-non-ref-field", f"type is {declared.type!r}, not ref"
@@ -505,6 +571,40 @@ def _validate_field(
                 "which is not a core lexicon",
             )
 
+    if declared.generator_kind == "int_uniform":
+        low = declared.params.get("low", 0)
+        high = declared.params.get("high", 1)
+        if not all(isinstance(value, int) and not isinstance(value, bool) for value in (low, high)):
+            raise PackError(
+                file_path, location, "integer-range-shape", "int_uniform bounds are integers"
+            )
+        if high < low:
+            raise PackError(file_path, location, "integer-range-order", "high is below low")
+        width = high - low + 1
+        if width > TWO64:
+            raise PackError(
+                file_path,
+                location,
+                "sampler-domain-limit",
+                f"inclusive integer range width {width} exceeds the 64-bit sampler domain",
+            )
+
+    if declared.generator_kind == "enum_weighted":
+        values = declared.params.get("values", [])
+        weights = declared.params.get("weights", [])
+        if (
+            not isinstance(values, list)
+            or not isinstance(weights, list)
+            or len(values) != len(weights)
+        ):
+            raise PackError(
+                file_path,
+                location,
+                "weighted-enum-shape",
+                "enum_weighted declares equally sized values and weights lists",
+            )
+        _validate_weights(file_path, f"{location}/params/weights", weights)
+
     if declared.null_rate is not None and not declared.nullable:
         raise PackError(
             file_path,
@@ -512,3 +612,5 @@ def _validate_field(
             "null-rate-without-nullable",
             "declares null_rate but is not nullable",
         )
+    if declared.null_rate is not None:
+        _validate_probability(file_path, f"{location}/null_rate", declared.null_rate)
