@@ -22,7 +22,13 @@ from mintmark.cli import (
     EXIT_VERIFY_FAILED,
     main,
 )
-from mintmark.manifest import MANIFEST_FILENAME, SUMS_FILENAME, VALIDATOR_WARNING
+from mintmark.manifest import (
+    MANIFEST_FILENAME,
+    SUMS_FILENAME,
+    VALIDATOR_WARNING,
+    file_digest,
+    render_sums,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PACK = REPO_ROOT / "packs" / "example"
@@ -60,6 +66,24 @@ def dataset(minted: Path, tmp_path: Path) -> Path:
     target = tmp_path / "run"
     shutil.copytree(minted, target)
     return target
+
+
+def reseal_output(dataset: Path, output_name: str) -> None:
+    """Update self-referential hashes so semantic verification gets exercised."""
+    manifest_path = dataset / MANIFEST_FILENAME
+    document = json.loads(manifest_path.read_text(encoding="utf-8"))
+    sums: dict[str, str] = {}
+    for output in document["outputs"]:
+        output_path = dataset / output["path"]
+        if output["path"] == output_name:
+            output["sha256"] = file_digest(output_path)
+            output["bytes"] = output_path.stat().st_size
+        sums[output["path"]] = output["sha256"]
+    manifest_path.write_text(
+        json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    sums[MANIFEST_FILENAME] = file_digest(manifest_path)
+    (dataset / SUMS_FILENAME).write_text(render_sums(sums), encoding="utf-8")
 
 
 def test_the_pristine_dataset_verifies(dataset: Path) -> None:
@@ -217,6 +241,56 @@ def test_a_shifted_span_offset_is_caught(dataset: Path) -> None:
 
 
 @pytest.mark.adversarial
+def test_unknown_sidecar_label_fails_even_when_checksums_are_resealed(dataset: Path) -> None:
+    from mintmark.api import verify
+
+    path = dataset / "transaction.labels.jsonl"
+    lines = path.read_text(encoding="utf-8").splitlines()
+    for index, line in enumerate(lines):
+        record = json.loads(line)
+        if record["spans"]:
+            record["spans"][0]["label"] = "UNDECLARED"
+            lines[index] = json.dumps(record, ensure_ascii=False, separators=(",", ":"))
+            break
+    else:
+        pytest.skip("fixture emitted no spans")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    reseal_output(dataset, path.name)
+
+    report = verify(dataset)
+    assert not report.ok
+    assert any("unknown taxonomy label" in problem for problem in report.problems)
+
+
+@pytest.mark.adversarial
+def test_duplicate_sidecar_document_fails_when_checksums_are_resealed(dataset: Path) -> None:
+    from mintmark.api import verify
+
+    path = dataset / "transaction.labels.jsonl"
+    lines = path.read_text(encoding="utf-8").splitlines()
+    path.write_text("\n".join([*lines, lines[0]]) + "\n", encoding="utf-8")
+    reseal_output(dataset, path.name)
+
+    report = verify(dataset)
+    assert not report.ok
+    assert any("duplicate document" in problem for problem in report.problems)
+
+
+@pytest.mark.adversarial
+def test_omitted_sidecar_document_fails_when_checksums_are_resealed(dataset: Path) -> None:
+    from mintmark.api import verify
+
+    path = dataset / "transaction.labels.jsonl"
+    lines = path.read_text(encoding="utf-8").splitlines()
+    path.write_text("\n".join(lines[:-1]) + "\n", encoding="utf-8")
+    reseal_output(dataset, path.name)
+
+    report = verify(dataset)
+    assert not report.ok
+    assert any("omits document" in problem for problem in report.problems)
+
+
+@pytest.mark.adversarial
 def test_a_stripped_validator_warning_is_caught(tmp_path: Path) -> None:
     """This is how a checksum-valid dataset would circulate unlabeled."""
     out = tmp_path / "validator-run"
@@ -310,8 +384,6 @@ def test_reproduce_detects_a_changed_data_file(dataset: Path) -> None:
     record["first_name"] = "Değiştirildi"
     lines[0] = json.dumps(record, ensure_ascii=False, separators=(",", ":"))
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-
-    from mintmark.manifest import file_digest, render_sums
 
     manifest_path = dataset / MANIFEST_FILENAME
     document = json.loads(manifest_path.read_text(encoding="utf-8"))

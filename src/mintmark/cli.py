@@ -29,7 +29,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
-from mintmark.annotate import pin_digest
+from mintmark.annotate import Label, pin_digest
 from mintmark.identifiers import CHECKSUMMED
 from mintmark.manifest import MANIFEST_FILENAME, read_manifest, verify
 from mintmark.manifest.document import comparable
@@ -182,6 +182,7 @@ def _cmd_verify(args: argparse.Namespace) -> int:
         schema=_manifest_schema(),
         validators=_validators(),
         expected_taxonomy_pin=pin_digest(),
+        known_labels=frozenset(label.value for label in Label),
     )
     if args.json:
         print(json.dumps(report.to_json(), ensure_ascii=False, indent=2))
@@ -363,6 +364,7 @@ def _cmd_packcheck(args: argparse.Namespace) -> int:
                 schema=_manifest_schema(),
                 validators=_validators(),
                 expected_taxonomy_pin=pin_digest(),
+                known_labels=frozenset(label.value for label in Label),
             )
             problems.extend(f"recipe {recipe_name}: {p}" for p in report.problems)
 

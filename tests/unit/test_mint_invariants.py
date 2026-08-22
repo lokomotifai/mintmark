@@ -302,12 +302,89 @@ def test_the_sweep_still_catches_a_planted_valid_identifier(minted: Path, tmp_pa
 
 def test_a_digit_run_inside_a_longer_token_is_not_a_candidate() -> None:
     """The anchoring that stopped the false positive, asserted directly."""
-    from mintmark.manifest.verify import _CANDIDATE
+    from mintmark.manifest.safety import identifier_candidates
 
-    assert _CANDIDATE.findall("1234567890") == ["1234567890"]
-    assert _CANDIDATE.findall("ab1234567890cd") == []
-    assert _CANDIDATE.findall("26bf03eefa2dec60a2033640190cf612") == []
-    assert _CANDIDATE.findall("TR990000000000000000000001") == ["TR990000000000000000000001"]
+    assert list(identifier_candidates("1234567890")) == ["1234567890"]
+    assert list(identifier_candidates("ab1234567890cd")) == []
+    assert list(identifier_candidates("26bf03eefa2dec60a2033640190cf612")) == []
+    assert list(identifier_candidates("TR990000000000000000000001")) == [
+        "TR990000000000000000000001"
+    ]
+
+
+def test_candidate_scan_normalizes_grouped_iban_and_includes_integer_values() -> None:
+    from mintmark.engine.prng import SplitMix64
+    from mintmark.identifiers import IdentifierPolicy, iban, tckn
+    from mintmark.manifest.safety import identifier_candidates
+
+    grouped = iban.group(iban.generate(SplitMix64(1), IdentifierPolicy.VALIDATOR))
+    numeric = int(tckn.generate(SplitMix64(2), IdentifierPolicy.VALIDATOR))
+    assert list(identifier_candidates({"grouped": grouped})) == [grouped.replace(" ", "")]
+    assert list(identifier_candidates({"numeric": numeric})) == [str(numeric)]
+
+
+def test_safe_mint_rejects_checksum_valid_content_from_a_pack_lexicon(tmp_path: Path) -> None:
+    import shutil
+
+    import yaml
+
+    from mintmark.engine.prng import SplitMix64
+    from mintmark.identifiers import IdentifierPolicy, vkn
+    from mintmark.mint import MintError
+
+    pack = tmp_path / "pack"
+    shutil.copytree(PACK, pack)
+    lexicons = pack / "lexicons"
+    lexicons.mkdir()
+    valid = vkn.generate(SplitMix64(9), IdentifierPolicy.VALIDATOR)
+    (lexicons / "given_names_tr.yaml").write_text(
+        yaml.safe_dump({"name": "given_names_tr", "values": [valid]}), encoding="utf-8"
+    )
+    out = tmp_path / "out"
+
+    with pytest.raises(MintError, match="safe-policy invariant"):
+        mint(
+            pack=pack,
+            recipe="demo",
+            seed=1,
+            out=out,
+            records={"customer": 1, "transaction": 0},
+            invocation="pytest",
+        )
+    assert not out.exists()
+
+
+def test_safe_mint_rejects_checksum_valid_literal_in_document_template(tmp_path: Path) -> None:
+    import shutil
+
+    import yaml
+
+    from mintmark.engine.prng import SplitMix64
+    from mintmark.identifiers import IdentifierPolicy, iban
+    from mintmark.mint import MintError
+
+    pack = tmp_path / "pack"
+    shutil.copytree(PACK, pack)
+    template = pack / "templates" / "txn_descriptions" / "set.yaml"
+    document = yaml.safe_load(template.read_text(encoding="utf-8"))
+    valid = iban.group(iban.generate(SplitMix64(7), IdentifierPolicy.VALIDATOR))
+    for entry in document["entries"]:
+        entry["text"] = f"Referans {valid}."
+    template.write_text(
+        yaml.safe_dump(document, allow_unicode=True, sort_keys=False), encoding="utf-8"
+    )
+    out = tmp_path / "out"
+
+    with pytest.raises(MintError, match="checksum-valid IBAN"):
+        mint(
+            pack=pack,
+            recipe="demo",
+            seed=1,
+            out=out,
+            records={"customer": 1, "transaction": 1},
+            invocation="pytest",
+        )
+    assert not out.exists()
 
 
 # A birth date that sits inside the window the records describe.

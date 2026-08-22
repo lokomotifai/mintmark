@@ -592,6 +592,14 @@ def _cross_validate(
                 f"{duplicate_names} declared more than once",
             )
 
+        if len(record_type.document_fields) > 1:
+            raise PackError(
+                path / f"{record_type.type_name}.yaml",
+                "fields",
+                "multiple-document-fields",
+                "a record type may declare at most one document field",
+            )
+
         for declared in record_type.fields:
             _validate_field(
                 path, record_type, declared, known_types, order_of, template_sets, lexicons
@@ -620,6 +628,45 @@ def _validate_field(
 ) -> None:
     location = f"{record_type.type_name}/{declared.name}"
     file_path = path / f"{record_type.type_name}.yaml"
+
+    if declared.type == "doc" and declared.generator_kind != "grammar":
+        raise PackError(
+            file_path,
+            location,
+            "document-generator",
+            "a document field must use a grammar generator",
+        )
+    if declared.generator_kind == "grammar" and declared.type != "doc":
+        raise PackError(
+            file_path,
+            location,
+            "grammar-field-type",
+            "a grammar generator may only populate a document field",
+        )
+    if declared.type == "doc" and declared.pii_label != "none":
+        raise PackError(
+            file_path,
+            location,
+            "document-field-label",
+            "a document's PII is represented by spans; its field label must be none",
+        )
+
+    if declared.generator_kind == "identifier":
+        expected_label = declared.generator_argument
+        if declared.pii_label != expected_label:
+            raise PackError(
+                file_path,
+                location,
+                "identifier-label-mismatch",
+                f"{declared.generator!r} requires pii_label {expected_label!r}",
+            )
+    if declared.generator == "derived:email_from_name" and declared.pii_label != "EMAIL":
+        raise PackError(
+            file_path,
+            location,
+            "derived-email-label",
+            "derived:email_from_name requires pii_label 'EMAIL'",
+        )
 
     if declared.type == "ref":
         if declared.ref is None:

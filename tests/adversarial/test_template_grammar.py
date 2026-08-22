@@ -28,7 +28,8 @@ from mintmark.engine.templates import (
     TemplateError,
     parse_template,
 )
-from mintmark.mint import mint
+from mintmark.mint import MintError, mint
+from mintmark.packs.model import PackError, load_pack
 
 LABELS = frozenset({"PERSON", "ORG", "HEALTH", "UNION", "IBAN", "TCKN"})
 IDENTIFIERS = frozenset({"TCKN", "VKN", "IBAN", "PAN", "PHONE", "EMAIL"})
@@ -170,3 +171,64 @@ def test_all_templates_compile_before_minting_records(tmp_path: Path) -> None:
 
     assert caught.value.rule == "template-nesting-limit"
     assert not out.exists()
+
+
+def test_template_field_slot_must_resolve_for_its_document_record(tmp_path: Path) -> None:
+    pack = tmp_path / "pack"
+    shutil.copytree(CONFORMANCE, pack)
+    template = pack / "templates" / "complaints" / "set.yaml"
+    document = yaml.safe_load(template.read_text(encoding="utf-8"))
+    document["entries"][0]["text"] = "{field:complaint_ticket.nonexistent}"
+    template.write_text(
+        yaml.safe_dump(document, allow_unicode=True, sort_keys=False), encoding="utf-8"
+    )
+    out = tmp_path / "out"
+
+    with pytest.raises(MintError, match="unknown field"):
+        mint(pack=pack, recipe="full", seed=1, out=out, invocation="pytest")
+    assert not out.exists()
+
+
+@pytest.mark.parametrize(
+    ("file_name", "field_name", "attribute", "value", "rule"),
+    [
+        ("customer.yaml", "national_id", "pii_label", "none", "identifier-label-mismatch"),
+        ("customer.yaml", "email", "pii_label", "none", "derived-email-label"),
+        ("complaint_ticket.yaml", "body", "pii_label", "PERSON", "document-field-label"),
+        ("complaint_ticket.yaml", "body", "type", "str", "grammar-field-type"),
+    ],
+)
+def test_field_annotation_contracts_fail_closed(
+    tmp_path: Path,
+    file_name: str,
+    field_name: str,
+    attribute: str,
+    value: str,
+    rule: str,
+) -> None:
+    pack = tmp_path / "pack"
+    shutil.copytree(CONFORMANCE, pack)
+    path = pack / "fields" / file_name
+    document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    field = next(item for item in document["fields"] if item["name"] == field_name)
+    field[attribute] = value
+    path.write_text(yaml.safe_dump(document, allow_unicode=True, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(PackError) as caught:
+        load_pack(pack)
+    assert caught.value.rule == rule
+
+
+def test_a_record_type_cannot_hide_a_second_document_field(tmp_path: Path) -> None:
+    pack = tmp_path / "pack"
+    shutil.copytree(CONFORMANCE, pack)
+    path = pack / "fields" / "complaint_ticket.yaml"
+    document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    duplicate = dict(document["fields"][-1])
+    duplicate["name"] = "second_body"
+    document["fields"].append(duplicate)
+    path.write_text(yaml.safe_dump(document, allow_unicode=True, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(PackError) as caught:
+        load_pack(pack)
+    assert caught.value.rule == "multiple-document-fields"

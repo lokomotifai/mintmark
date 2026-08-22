@@ -50,8 +50,15 @@ from mintmark.engine.records import (
 )
 from mintmark.engine.streams import StreamFactory
 from mintmark.engine.tables import Table, load_table
-from mintmark.engine.templates import Node, parse_template
-from mintmark.identifiers import ALL_ENGINES, IdentifierPolicy, email, pan, parse_policy
+from mintmark.engine.templates import Alternation, FieldSlot, Node, Optional, parse_template
+from mintmark.identifiers import (
+    ALL_ENGINES,
+    CHECKSUMMED,
+    IdentifierPolicy,
+    email,
+    pan,
+    parse_policy,
+)
 from mintmark.lexicons import load as load_denylist
 from mintmark.manifest import (
     MANIFEST_FILENAME,
@@ -64,6 +71,7 @@ from mintmark.manifest import (
     render_sums,
 )
 from mintmark.manifest.document import SUPPORTED_PLATFORMS
+from mintmark.manifest.safety import identifier_candidates
 from mintmark.packs.model import (
     Field,
     Pack,
@@ -229,6 +237,9 @@ def mint(
         if docs:
             sidecars[record_type.type_name] = docs
 
+    if policy is IdentifierPolicy.SAFE:
+        _assert_safe_records(generated)
+
     return _write(
         target=target,
         loaded=loaded,
@@ -262,6 +273,16 @@ class _MintContext:
         """Compile every declared template before any records are generated."""
         for set_name in sorted(self.pack.template_sets):
             self.templates(set_name)
+        for record_type in self.pack.record_types:
+            allowed = {f"{record_type.type_name}.{field.name}" for field in record_type.fields}
+            for document_field in record_type.document_fields:
+                for entry in self._templates[document_field.generator_argument]:
+                    for path in _field_slot_paths(entry):
+                        if path not in allowed:
+                            raise MintError(
+                                f"template set {document_field.generator_argument!r} references "
+                                f"unknown field {path!r} for record type {record_type.type_name!r}"
+                            )
 
     def table(self, name: str) -> Table:
         if name not in self._tables:
@@ -537,9 +558,35 @@ class _MintContext:
 def _resolve(graph: dict[str, Record], path: str) -> Any:
     head, _, tail = path.partition(".")
     record = graph.get(head)
-    if record is None:
-        return None
-    return record.get(tail)
+    if record is None or not tail or tail not in record:
+        raise MintError(f"template field slot {path!r} is not present in the record graph")
+    return record[tail]
+
+
+def _field_slot_paths(nodes: tuple[Node, ...]) -> Sequence[str]:
+    paths: list[str] = []
+    for node in nodes:
+        if isinstance(node, FieldSlot):
+            paths.append(node.path)
+        elif isinstance(node, Alternation):
+            for branch in node.branches:
+                paths.extend(_field_slot_paths(branch))
+        elif isinstance(node, Optional):
+            paths.extend(_field_slot_paths(node.body))
+    return paths
+
+
+def _assert_safe_records(generated: dict[str, list[Record]]) -> None:
+    """Prove the safe-policy claim against final values, regardless of their source."""
+    for type_name, rows in generated.items():
+        for index, row in enumerate(rows):
+            for candidate in identifier_candidates(row):
+                for identifier_name, engine in CHECKSUMMED.items():
+                    if engine.is_checksum_valid(candidate):
+                        raise MintError(
+                            f"safe-policy invariant failed at {type_name} record {index}: "
+                            f"output contains a checksum-valid {identifier_name}"
+                        )
 
 
 _CORE_LEXICON_CACHE: dict[str, list[str]] = {}

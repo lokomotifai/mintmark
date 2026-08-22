@@ -17,11 +17,10 @@ the whole picture.
 from __future__ import annotations
 
 import json
-import re
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
-from itertools import islice
+from itertools import islice, pairwise
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +33,7 @@ from mintmark.manifest.io import (
     DatasetIOError,
     DatasetReader,
 )
+from mintmark.manifest.safety import identifier_candidates
 from mintmark.manifest.sums import SUMS_FILENAME, parse_sums
 
 Validator = Callable[[str], bool]
@@ -100,6 +100,7 @@ def verify(
     schema: dict[str, Any],
     validators: dict[str, Validator],
     expected_taxonomy_pin: str | None = None,
+    known_labels: frozenset[str] = frozenset(),
 ) -> VerifyReport:
     """Recompute every claim the manifest makes."""
     directory = Path(directory)
@@ -162,7 +163,7 @@ def verify(
         _check_validator_warning(document, report)
         _check_checksums(reader, document, report)
         _check_sums_file(reader, document, report)
-        _check_spans(reader, document, report)
+        _check_spans(reader, document, report, known_labels=known_labels)
         if report.identifier_policy == "safe":
             _sweep_identifiers(reader, document, validators, report)
 
@@ -289,7 +290,11 @@ def _check_sums_file(
 
 
 def _check_spans(
-    reader: DatasetReader, document: dict[str, Any], report: VerifyReport
+    reader: DatasetReader,
+    document: dict[str, Any],
+    report: VerifyReport,
+    *,
+    known_labels: frozenset[str],
 ) -> None:
     """Re-extract every span from the text it indexes."""
     import hashlib
@@ -308,6 +313,7 @@ def _check_spans(
         except (DatasetIOError, OSError, ValueError) as exc:
             report.problems.append(str(exc))
             continue
+        sidecar_ids: set[str] = set()
         for number, line in enumerate(sidecar_text.splitlines(), start=1):
             if not line.strip():
                 continue
@@ -321,6 +327,12 @@ def _check_spans(
                 report.problems.append(f"{sidecar_name} line {number}: malformed sidecar record")
                 continue
             text = texts.get(record["doc_id"])
+            if record["doc_id"] in sidecar_ids:
+                report.problems.append(
+                    f"{sidecar_name} line {number}: duplicate document {record['doc_id']!r}"
+                )
+                continue
+            sidecar_ids.add(record["doc_id"])
             if text is None:
                 report.problems.append(
                     f"{sidecar_name} line {number}: no document {record['doc_id']}"
@@ -337,6 +349,7 @@ def _check_spans(
                     f"{sidecar_name} line {number}: text_sha256 does not match the document"
                 )
                 continue
+            intervals: list[tuple[int, int]] = []
             for span in record["spans"]:
                 report.spans_checked += 1
                 if (
@@ -345,6 +358,15 @@ def _check_spans(
                     or not isinstance(span.get("end"), int)
                 ):
                     report.problems.append(f"{sidecar_name} line {number}: malformed span")
+                    continue
+                if isinstance(span["start"], bool) or isinstance(span["end"], bool):
+                    report.problems.append(f"{sidecar_name} line {number}: malformed span")
+                    continue
+                label = span.get("label")
+                if not isinstance(label, str) or label not in known_labels:
+                    report.problems.append(
+                        f"{sidecar_name} line {number}: unknown taxonomy label {label!r}"
+                    )
                     continue
                 if span["end"] > len(text) or span["start"] < 0 or span["start"] >= span["end"]:
                     report.problems.append(
@@ -356,6 +378,15 @@ def _check_spans(
                         f"{sidecar_name} line {number}: span [{span['start']}, "
                         f"{span['end']}) covers only whitespace"
                     )
+                intervals.append((span["start"], span["end"]))
+            ordered = sorted(intervals)
+            if len(set(ordered)) != len(ordered):
+                report.problems.append(f"{sidecar_name} line {number}: duplicate spans")
+            for earlier, later in pairwise(ordered):
+                if later[0] < earlier[1]:
+                    report.problems.append(f"{sidecar_name} line {number}: overlapping spans")
+        for missing in sorted(set(texts) - sidecar_ids):
+            report.problems.append(f"{sidecar_name}: omits document {missing!r}")
 
 
 def _find_data_file(names: set[str], stem: str) -> str | None:
@@ -385,29 +416,14 @@ def _document_texts(reader: DatasetReader, name: str) -> dict[str, str]:
         doc_id = next((v for k, v in record.items() if k.endswith("_id")), None)
         if doc_id is None:
             continue
+        document_id = str(doc_id)
+        if document_id in texts:
+            raise ValueError(f"{name} line {number}: duplicate document id {document_id!r}")
         for key, value in record.items():
             if key in {"body", "description", "text", "note"} and isinstance(value, str):
-                texts[str(doc_id)] = value
+                texts[document_id] = value
                 break
     return texts
-
-
-# Identifier shapes, anchored so a run of digits inside a longer token is not a
-# candidate. A SHA-256 digest is sixty-four hex characters and frequently contains
-# a ten-digit run; roughly one in ten such runs satisfies the VKN check by chance.
-_CANDIDATE = re.compile(r"(?<![0-9A-Za-z])(?:[A-Z]{2}[0-9]{24}|[0-9]{10,16})(?![0-9A-Za-z])")
-
-
-def _string_values(value: object) -> Iterable[str]:
-    """Yield every string a consumer would read as a value."""
-    if isinstance(value, str):
-        yield value
-    elif isinstance(value, dict):
-        for item in value.values():
-            yield from _string_values(item)
-    elif isinstance(value, list):
-        for item in value:
-            yield from _string_values(item)
 
 
 def _sweep_identifiers(
@@ -444,19 +460,18 @@ def _sweep_identifiers(
                 continue
             try:
                 record = json.loads(line)
-            except json.JSONDecodeError:
+            except (json.JSONDecodeError, RecursionError):
                 report.problems.append(f"{name} line {number}: not valid JSON")
                 continue
-            for value in _string_values(record):
-                for candidate in set(_CANDIDATE.findall(value)):
-                    for validator_name, validator in validators.items():
-                        if validator(candidate):
-                            report.checksum_valid_identifiers += 1
-                            report.problems.append(
-                                f"{name} line {number}: {candidate!r} is a "
-                                f"checksum-valid {validator_name} under a safe policy; safe mode "
-                                "is the product's safety claim"
-                            )
+            for candidate in identifier_candidates(record):
+                for validator_name, validator in validators.items():
+                    if validator(candidate):
+                        report.checksum_valid_identifiers += 1
+                        report.problems.append(
+                            f"{name} line {number}: contains a checksum-valid "
+                            f"{validator_name} under a safe policy; safe mode is the "
+                            "product's safety claim"
+                        )
 
     for name in (item for item in names if item.endswith(".csv")):
         try:
@@ -464,15 +479,11 @@ def _sweep_identifiers(
         except (DatasetIOError, OSError) as exc:
             report.problems.append(str(exc))
             continue
-        for candidate in set(_CANDIDATE.findall(text)):
+        for candidate in identifier_candidates(text):
             for validator_name, validator in validators.items():
                 if validator(candidate):
                     report.checksum_valid_identifiers += 1
                     report.problems.append(
-                        f"{name}: {candidate!r} is a checksum-valid {validator_name} "
+                        f"{name}: contains a checksum-valid {validator_name} "
                         "under a safe policy"
                     )
-
-
-def all_files(directory: Path) -> Iterable[Path]:
-    return (p for p in sorted(Path(directory).rglob("*")) if p.is_file())

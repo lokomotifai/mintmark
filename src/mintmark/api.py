@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from mintmark.annotate import pin_digest
+from mintmark.annotate import Label, pin_digest
 from mintmark.identifiers import CHECKSUMMED
 from mintmark.manifest import VerifyReport
 from mintmark.manifest import verify as _verify
@@ -31,4 +31,5 @@ def verify(directory: str | Path) -> VerifyReport:
         schema=schema,
         validators=validators,
         expected_taxonomy_pin=pin_digest(),
+        known_labels=frozenset(label.value for label in Label),
     )
