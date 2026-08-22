@@ -191,3 +191,42 @@ def test_files_are_written_with_lf_endings(tmp_path: Path) -> None:
     raw = (tmp_path / "run" / "data.jsonl").read_bytes()
     assert b"\r\n" not in raw
     assert raw == b"first\nsecond\n"
+
+
+def test_concurrent_staging_directories_never_share_bytes(tmp_path: Path) -> None:
+    target = tmp_path / "run"
+
+    def race() -> None:
+        with staged_output(target) as first, staged_output(target) as second:
+            assert first.path != second.path
+            with first.open("data.jsonl") as handle:
+                handle.write("first\n")
+            with second.open("data.jsonl") as handle:
+                handle.write("second\n")
+            first.commit()
+
+    with pytest.raises(FileExistsError):
+        race()
+
+    assert (target / "data.jsonl").read_text(encoding="utf-8") == "first\n"
+    assert list(tmp_path.glob(".run.staging-*")) == []
+
+
+def test_staged_output_refuses_parent_traversal(tmp_path: Path) -> None:
+    with staged_output(tmp_path / "run") as staged:
+        with pytest.raises(ValueError, match="single file names"):
+            staged.open("../escape.jsonl")
+        staged.open("safe.jsonl").close()
+    assert not (tmp_path / "escape.jsonl").exists()
+
+
+def test_staged_output_does_not_follow_a_preplanted_leaf_symlink(tmp_path: Path) -> None:
+    outside = tmp_path / "outside"
+    outside.write_text("keep\n", encoding="utf-8")
+    with staged_output(tmp_path / "run") as staged:
+        (staged.path / "data.jsonl").symlink_to(outside)
+        with pytest.raises(FileExistsError):
+            staged.open("data.jsonl")
+        (staged.path / "data.jsonl").unlink()
+        staged.open("safe.jsonl").close()
+    assert outside.read_text(encoding="utf-8") == "keep\n"
