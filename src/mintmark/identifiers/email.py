@@ -13,8 +13,8 @@ it is worth having precisely because the phone engine cannot offer the same.
 from __future__ import annotations
 
 from mintmark.engine.draws import bounded, bounded_range
+from mintmark.engine.fold import fold_for_local_part
 from mintmark.engine.prng import SplitMix64
-from mintmark.identifiers.fold import fold_for_local_part
 from mintmark.identifiers.policy import IdentifierPolicy
 
 LABEL = "EMAIL"

@@ -1,0 +1,33 @@
+name: street_parts_tr
+source_note: Address grammar components in neutral register. Invented, not drawn from any
+  real address register.
+mahalle:
+- Cumhuriyet
+- Fatih
+- Yeni
+- Bahçelievler
+- Yeşiltepe
+- Gültepe
+- Barbaros
+- Karşıyaka
+- Esentepe
+- Çamlık
+- Güzelyalı
+- Kavaklıdere
+street:
+- Zafer
+- Menekşe
+- Papatya
+- Lale
+- Çınar
+- Ihlamur
+- Gül
+- Manolya
+- Akasya
+- Erguvan
+- Defne
+- Yasemin
+street_kind:
+- Sokak
+- Caddesi
+- Bulvarı

@@ -42,12 +42,13 @@ dev = [
 packages = ["src/mintmark"]
 
 # Data directories are added here by the milestone that creates them:
-# assets/tables -> WP-02 (done), assets/denylist -> WP-05, schemas -> WP-06,
+# assets/tables -> WP-02 (done), assets/denylist -> WP-05 (done), schemas -> WP-06,
 # packs/example -> WP-12. WP-16's packaging manifest test asserts the final set.
 # No empty placeholder directories are created to satisfy this config early.
 
 [tool.hatch.build.targets.wheel.force-include]
 "assets/tables" = "mintmark/_data/assets/tables"
+"assets/denylist" = "mintmark/_data/assets/denylist"
 
 [tool.hatch.build.targets.sdist]
 include = [

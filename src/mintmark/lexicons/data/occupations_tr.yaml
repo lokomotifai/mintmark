@@ -1,0 +1,28 @@
+name: occupations_tr
+source_note: Occupation titles in neutral register. Invented list, no source.
+values:
+- öğretmen
+- mühendis
+- doktor
+- hemşire
+- avukat
+- muhasebeci
+- teknisyen
+- satış temsilcisi
+- şoför
+- aşçı
+- garson
+- kuaför
+- terzi
+- marangoz
+- elektrikçi
+- tesisatçı
+- güvenlik görevlisi
+- memur
+- emekli
+- öğrenci
+- serbest meslek
+- esnaf
+- çiftçi
+- yazılım geliştirici
+- grafik tasarımcı

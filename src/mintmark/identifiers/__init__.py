@@ -13,8 +13,8 @@ from __future__ import annotations
 
 from types import ModuleType
 
+from mintmark.engine.fold import fold, fold_for_local_part
 from mintmark.identifiers import email, iban, pan, phone, tckn, vkn
-from mintmark.identifiers.fold import fold, fold_for_local_part
 from mintmark.identifiers.policy import IdentifierPolicy, parse_policy
 
 # Engines whose output carries a checksum, and which the safe-mode sweep covers.

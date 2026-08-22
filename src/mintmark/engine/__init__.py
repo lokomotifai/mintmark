@@ -14,6 +14,7 @@ from mintmark.engine.draws import (
     datetime_in_window,
     weighted_index,
 )
+from mintmark.engine.fold import fold, fold_for_local_part
 from mintmark.engine.prng import SplitMix64
 from mintmark.engine.streams import StreamFactory, derive_stream_seed
 
@@ -24,5 +25,7 @@ __all__ = [
     "bounded",
     "datetime_in_window",
     "derive_stream_seed",
+    "fold",
+    "fold_for_local_part",
     "weighted_index",
 ]

@@ -1,0 +1,88 @@
+# Real Turkish financial institutions. A generated name must never collide
+# with any entry here. Packs may extend this list and may never shrink it.
+#
+# Source: TCMB Odeme Sistemleri Katilimcilari, revision 072025.
+# Retrieved: 2026-08-22. 71 participants, bank codes 0001 to 0807.
+# URL: https://www.tcmb.gov.tr/wps/wcm/connect/9fa62a85-5b6d-46c5-9b01-eb461d43723d/
+#
+# Matching is folded, contiguous-phrase, and word-boundary aware.
+#
+# Two rules shape these entries, and both were learned from a miss:
+#   Legal-form and category words are stripped, because every fictional bank
+#   this project generates contains the word 'bank'. But a connector inside a
+#   name is kept, because matching is contiguous and 'yapi kredi bankasi' never
+#   appears inside 'yapi ve kredi bankasi'.
+#   An entry whose distinctive part is short or is an ordinary Turkish word keeps
+#   the whole name. 'is' is the brand of Turkiye Is Bankasi and also the ordinary
+#   word for work; 'hayat' means life. Alone, either fires on ordinary prose.
+
+adil katilim bankasi    # ADİL KATILIM BANKASI A.Ş.
+akbank    # AKBANK T.A.Ş.
+aktif yatirim bankasi    # AKTİF YATIRIM BANKASI A.Ş.
+albaraka    # ALBARAKA TÜRK KATILIM BANKASI A.Ş.
+alternatifbank    # ALTERNATİFBANK A.Ş.
+anadolubank    # ANADOLUBANK A.Ş.
+arap turk bankasi    # ARAP TÜRK BANKASI
+aytemiz    # AYTEMİZ YATIRIM BANKASI A.Ş.
+bankpozitif kredi ve kalk.bank.a.s    # BANKPOZİTİF KREDİ VE KALK.BANK.A.Ş.
+birlesik fon    # BİRLEŞİK FON BANKASI A.Ş.
+burgan    # BURGAN BANK A.Ş.
+citibank    # CITIBANK A.Ş.
+colendi bank    # COLENDİ BANK A.Ş.
+d yatirim bankasi    # D YATIRIM BANKASI A.Ş.
+denizbank    # DENİZBANK A.Ş.
+destek yatirim bankasi    # DESTEK YATIRIM BANKASI A.Ş.
+deutsche    # DEUTSCHE BANK A.Ş.
+diler    # DİLER YATIRIM BANKASI A.Ş.
+dunya katilim bankasi    # DÜNYA KATILIM BANKASI A.Ş.
+ekonomi bankasi    # T. EKONOMİ BANKASI A.Ş.
+enpara bank    # ENPARA BANK A.Ş.
+eximbank    # T. EXİMBANK
+fibabanka    # FİBABANKA A.Ş.
+fups bank    # FUPS BANK A.Ş.
+garanti    # T. GARANTİ BANKASI A.Ş.
+golden global yatirim bankasi    # GOLDEN GLOBAL YATIRIM BANKASI A.Ş.
+gsd yatirim bankasi    # GSD YATIRIM BANKASI A.Ş.
+halk    # T. HALK BANKASI A.Ş.
+hayat finans katilim bankasi    # HAYAT FİNANS KATILIM BANKASI
+hedef yatirim bankasi    # HEDEF YATIRIM BANKASI A.Ş.
+hepsi bank    # HEPSİ BANK A.Ş.
+hsbc    # HSBC BANK A.Ş.
+icbc    # ICBC TURKEY BANK A.Ş.
+iktisat    # İKTİSAT KATILIM BANKASI A.Ş.
+iller bankasi    # İLLER BANKASI A.Ş.
+ing bank    # ING BANK A.Ş.
+intesa sanpaolo    # INTESA SANPAOLO S.P.A.
+is bankasi    # T. İŞ BANKASI A.Ş.
+istanbul takas ve saklama bank    # İSTANBUL TAKAS VE SAKLAMA BANK. A.Ş.
+jpmorgan chase    # JPMORGAN CHASE BANK N.A.
+kalkinma bankasi    # T. KALKINMA BANKASI A.Ş.
+kuveyt    # KUVEYT TÜRK KATILIM BANKASI A.Ş.
+merkez bankasi    # T.C. MERKEZ BANKASI
+merkezi kayit kurulusu    # MERKEZİ KAYIT KURULUŞU A.Ş.
+misyon yatirim bankasi    # MİSYON YATIRIM BANKASI A.Ş.
+mufg    # MUFG BANK TURKEY A.Ş.
+nurol    # NUROL YATIRIM BANKASI A.Ş.
+odea    # ODEA BANK A.Ş.
+of america    # BANK OF AMERICA YATIRIM BANK A.Ş.
+of china    # BANK OF CHINA TURKEY A.Ş.
+pasha    # PASHA YATIRIM BANK A.Ş.
+posta ve telgraf teskilati    # POSTA VE TELGRAF TEŞKİLATI A.Ş.
+q yatirim bankasi    # Q YATIRIM BANKASI A.Ş.
+qnb finansbank    # QNB FİNANSBANK A.Ş.
+sekerbank    # ŞEKERBANK T.A.Ş.
+sinai kalkinma bankasi    # T. SINAİ KALKINMA BANKASI A.Ş.
+societe generale    # SOCIETE GENERALE (SA)
+standard chartered yatirim bankasi turk    # STANDARD CHARTERED YATIRIM BANKASI TÜRK A.Ş.
+t.o.m    # T.O.M. KATILIM BANKASI A.Ş.
+tera yatirim bankasi    # TERA YATIRIM BANKASI A.Ş.
+turk ticaret bankasi    # TÜRK TİCARET BANKASI A.Ş.
+turkish bank    # TURKISH BANK A.Ş.
+turkiye emlak katilim bankasi    # TÜRKİYE EMLAK KATILIM BANKASI A.Ş.
+turkiye finans katilim bankasi    # TÜRKİYE FİNANS KATILIM BANKASI A.Ş.
+turkland    # TURKLAND BANK A.S.
+vakif katilim bankasi    # VAKIF KATILIM BANKASI A.Ş.
+vakiflar bankasi    # T. VAKIFLAR BANKASI T.A.O.
+yapi ve kredi bankasi    # YAPI VE KREDİ BANKASI A.Ş.
+ziraat    # T.C. ZİRAAT BANKASI A.Ş.
+ziraat dinamik    # ZİRAAT DİNAMİK BANKA A.Ş.

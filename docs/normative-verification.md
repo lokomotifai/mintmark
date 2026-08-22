@@ -106,6 +106,44 @@ coincide with an assigned one. Both READMEs state this limitation and state the
 purpose limitation that follows: this data is for testing systems, never for
 contacting anyone.
 
+## Institution denylist
+
+**Owning milestone:** WP-05. **Verified:** 2026-08-22. **Drift risk:** real.
+Institutions are licensed, merge, rename, and are wound up. **Wired into the
+cadence workflow.**
+
+**Source.** The same TCMB participant list used for the bank code check, revision
+072025, retrieved 2026-08-22. It names 71 licensed institutions, which is the
+authoritative public register of who actually exists.
+
+**Outcome.** 70 denylist entries, covering all 71 participants. Every entry is
+matched back against the institution it came from by a test, so an entry that
+cannot match its own source fails the build.
+
+**Two extraction rules, both learned from a miss rather than anticipated.**
+
+Stripping legal-form and category words is necessary, because every fictional
+bank this project generates contains the word "bank" and an unstripped entry
+would match all of them. But stripping went too far twice.
+
+First, a short brand disappeared. "T. İŞ BANKASI A.Ş." reduces to "is", two
+characters, which fell below the minimum entry length and silently removed one of
+the country's largest banks from the list. Short cores now keep the whole name.
+
+Second, a connector was dropped. "YAPI VE KREDİ BANKASI A.Ş." became the phrase
+"yapi kredi bankasi", and because matching is contiguous, that phrase never
+appears inside the institution's own name. The entry matched nothing while
+looking like coverage, which is worse than an absent entry. Connectors inside a
+name are now preserved.
+
+**The opposing constraint.** Several real institutions are named after ordinary
+Turkish words: hayat means life, dunya means world, hedef means target, destek
+means support, is means work. An entry consisting of one of those alone fires on
+ordinary prose in every document this project generates, and a lint that cries
+wolf is switched off within a week. Generic cores therefore keep the whole name
+too, and a test sweeps ten ordinary Turkish sentences to prove none of them trips
+the scan.
+
 ## Still to verify
 
 These belong to milestones that have not run yet and are listed so that nobody
@@ -113,7 +151,6 @@ mistakes their absence for a completed check.
 
 | Fact | Owning milestone | Wired into cadence |
 | --- | --- | --- |
-| Institution denylist, from the Turkish banking association member list and peer registries | WP-05 | Yes |
 | Turkey's permanent UTC+3 status, which the +03:00 rendering assumes | WP-07 | Yes |
 | Taxonomy pin against the hushmark-tr closed v0.1 label set | WP-04 | Yes |
 
