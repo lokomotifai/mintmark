@@ -279,7 +279,22 @@ def _document_texts(path: Path) -> dict[str, str]:
     return texts
 
 
-_CANDIDATE = re.compile(r"[A-Z]{2}[0-9]{24}|[0-9]{10,16}")
+# Identifier shapes, anchored so a run of digits inside a longer token is not a
+# candidate. A SHA-256 digest is sixty-four hex characters and frequently contains
+# a ten-digit run; roughly one in ten such runs satisfies the VKN check by chance.
+_CANDIDATE = re.compile(r"(?<![0-9A-Za-z])(?:[A-Z]{2}[0-9]{24}|[0-9]{10,16})(?![0-9A-Za-z])")
+
+
+def _string_values(value: object) -> Iterable[str]:
+    """Yield every string a consumer would read as a value."""
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for item in value.values():
+            yield from _string_values(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from _string_values(item)
 
 
 def _sweep_identifiers(
@@ -287,21 +302,48 @@ def _sweep_identifiers(
 ) -> None:
     """Invariant 2, checked on the artifacts rather than on the generator.
 
-    Every candidate string in every emitted file is put through every validator.
-    A hit means safe mode produced a value a real validator would accept, which is
-    the one thing the product promises cannot happen.
+    Only the string values of data files are examined. Two earlier approaches were
+    wrong in ways worth recording.
+
+    Scanning raw file text swept the label sidecars too, and a sidecar carries no
+    data at all: only document ids, SHA-256 digests, and offsets. A digest is hex,
+    so it regularly contains a ten-digit run, and about one such run in ten passes
+    the VKN check by chance. The sweep fired on its own checksum. A safety check
+    that cries wolf gets switched off, which is worse than not having it.
+
+    Scanning parsed values but matching unanchored would have the same problem
+    inside any long alphanumeric field, so the pattern is anchored on both sides.
     """
-    for path in sorted(directory.rglob("*")):
-        if not path.is_file() or path.name in {MANIFEST_FILENAME, SUMS_FILENAME}:
+    for path in sorted(directory.glob("*.jsonl")):
+        if path.name.endswith(".labels.jsonl"):
             continue
-        text = path.read_text(encoding="utf-8", errors="replace")
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+            if not line.strip():
+                continue
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                report.problems.append(f"{path.name} line {number}: not valid JSON")
+                continue
+            for value in _string_values(record):
+                for candidate in set(_CANDIDATE.findall(value)):
+                    for name, validator in validators.items():
+                        if validator(candidate):
+                            report.checksum_valid_identifiers += 1
+                            report.problems.append(
+                                f"{path.name} line {number}: {candidate!r} is a "
+                                f"checksum-valid {name} under a safe policy; safe mode "
+                                "is the product's safety claim"
+                            )
+
+    for path in sorted(directory.glob("*.csv")):
+        text = path.read_text(encoding="utf-8")
         for candidate in set(_CANDIDATE.findall(text)):
             for name, validator in validators.items():
                 if validator(candidate):
                     report.checksum_valid_identifiers += 1
                     report.problems.append(
-                        f"{path.name}: {candidate!r} is a checksum-valid {name} under "
-                        "a safe policy; safe mode is the product's safety claim"
+                        f"{path.name}: {candidate!r} is a checksum-valid {name} under a safe policy"
                     )
 
 

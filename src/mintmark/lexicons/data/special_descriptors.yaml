@@ -1,0 +1,138 @@
+name: special_descriptors
+source_note: 'Curated neutral-register descriptors for the labels a document template can inject.
+  Invented; no source register. Special-category entries stay at category granularity: a class
+  of thing, never a clinical detail, never an accusation, never attached to a real organization
+  or a real public figure. Reviewed by hand rather than generated, because the provenance of every
+  special-category surface has to be traceable to a file a person signed off.'
+labels:
+  HEALTH:
+    note: Condition classes at category granularity. Never a diagnosis, a treatment, a medication,
+      or a prognosis.
+    values:
+    - kronik rahatsızlık
+    - geçici iş göremezlik
+    - rutin kontrol
+    - istirahat raporu
+    - kontrol randevusu
+    - ameliyat sonrası izin
+    - sağlık raporu
+    - tedavi süreci
+    - fizik tedavi programı
+    - doğum öncesi izin
+    - iş kazası sonrası rapor
+    - sevk belgesi
+  RELIGION:
+    note: Observance and accommodation, not belief content.
+    values:
+    - dini bayram izni
+    - inanç gereği izin talebi
+    - ibadet saati düzenlemesi
+    - dini gün izni
+    - oruç dönemi mesai talebi
+    - cenaze töreni izni
+  ETHNICITY:
+    note: Declared origin and language preference, as an HR or claims form would record them.
+    values:
+    - etnik köken beyanı
+    - anadil tercihi
+    - iki dilli iletişim talebi
+    - tercüman talebi
+    - yerel dil desteği
+  POLITICAL:
+    note: Fictional parties and civic bodies. No real party is ever named.
+    values:
+    - Yurttaş Hareketi
+    - Ortak Gelecek Partisi
+    - Dayanışma Girişimi
+    - Kent Konseyi üyeliği
+    - Yerel Meclis adaylığı
+    - Şehir Platformu
+  SEXUAL_LIFE:
+    note: Form-level references only. Never narrative, never detail.
+    values:
+    - özel yaşam beyanı
+    - medeni hâl güncellemesi
+    - aile durumu bildirimi
+    - eş bilgisi güncellemesi
+  CRIMINAL:
+    note: Check categories, never findings. 'A record was requested' is a process step; 'a record
+      exists' would be an accusation about a person, and this project does not make those even
+      about invented ones.
+    values:
+    - adli sicil kaydı sorgusu
+    - referans kontrolü
+    - güvenlik soruşturması
+    - sicil belgesi talebi
+    - arşiv kaydı sorgulaması
+  BIOMETRIC_REF:
+    note: References to biometric systems, not to biometric data itself.
+    values:
+    - parmak izi ile mesai kaydı
+    - yüz tanıma ile giriş
+    - biyometrik turnike kaydı
+    - avuç içi okuyucu kaydı
+    - parmak izi doğrulama hatası
+    - biyometrik kayıt güncellemesi
+  UNION:
+    note: Fictional unions. No real union is ever named.
+    values:
+    - Dayanışma Sendikası
+    - Birlik İş Sendikası
+    - Emek Sendikası
+    - Ortak Güç Sendikası
+    - Meridyen İşçi Sendikası
+    - Anka Çalışanlar Sendikası
+  PERSON:
+    note: Counterparty and third-party names for document surfaces. Drawn from the same common
+      Turkish name pool as the structured fields.
+    values:
+    - Mehmet Demir
+    - Ayşe Kaya
+    - Ali Yıldız
+    - Zeynep Şahin
+    - Mustafa Çelik
+    - Elif Aydın
+    - Hasan Yılmaz
+    - Fatma Özdemir
+    - Emre Arslan
+    - Merve Doğan
+    - Kemal Kılıç
+    - Selin Aslan
+  ORG:
+    note: Fictional organizations on the place-and-nature pattern the family uses. Every entry
+      passes the real-institution denylist scan.
+    values:
+    - Anka Lojistik
+    - Meridyen Teknoloji
+    - Toros Ticaret
+    - Ege Yapı
+    - Kuzey Yıldızı Danışmanlık
+    - Deniz Kum İnşaat
+    - Bereket Gıda
+    - Şafak Enerji
+    - Pusula Eğitim
+    - Çınar Sağlık Hizmetleri
+    - Marmara Tekstil
+    - Ilgaz Makine
+  ADDRESS:
+    note: Address fragments for document surfaces. Invented, not drawn from any real address register.
+    values:
+    - Cumhuriyet Mahallesi
+    - Zafer Sokak
+    - Menekşe Caddesi
+    - Yeşiltepe Mahallesi
+    - Çınar Sokak
+    - Barbaros Bulvarı
+    - Gültepe Mahallesi
+    - Lale Sokak
+  DOB:
+    note: Dates of birth as they appear inside prose rather than in a date field.
+    values:
+    - '1985-04-12'
+    - '1979-11-03'
+    - '1992-07-25'
+    - '1968-02-14'
+    - '1990-09-30'
+    - '1974-12-08'
+    - '1983-05-19'
+    - '1996-01-22'

@@ -235,3 +235,76 @@ def test_every_emitted_timestamp_carries_the_verified_offset(minted: Path) -> No
         if not line.strip():
             continue
         assert json.loads(line)["ts"].endswith("+03:00")
+
+
+# The safe-mode sweep, and the false positive that once fired inside a digest.
+
+
+def test_the_sweep_ignores_digests_and_offsets_in_sidecars(minted: Path) -> None:
+    """A sidecar carries no data, so nothing in it can be a leaked identifier.
+
+    This test exists because the sweep once read raw file text and swept the
+    sidecars too. A SHA-256 digest is sixty-four hex characters and regularly
+    contains a ten-digit run; about one such run in ten satisfies the VKN check by
+    chance. The sweep fired on its own checksum, and a safety check that cries
+    wolf is a safety check somebody switches off.
+    """
+    from mintmark.api import verify as verify_dataset
+
+    report = verify_dataset(minted)
+    assert report.checksum_valid_identifiers == 0
+    assert report.ok, report.problems
+
+
+def test_the_sweep_still_catches_a_planted_valid_identifier(minted: Path, tmp_path: Path) -> None:
+    """Narrowing the sweep must not have narrowed it into uselessness."""
+    import json
+    import shutil
+
+    from mintmark.api import verify as verify_dataset
+    from mintmark.identifiers import IdentifierPolicy, vkn
+    from mintmark.engine.prng import SplitMix64
+    from mintmark.manifest import file_digest, render_sums
+    from mintmark.manifest.document import MANIFEST_FILENAME
+    from mintmark.manifest.sums import SUMS_FILENAME
+
+    target = tmp_path / "planted"
+    shutil.copytree(minted, target)
+
+    valid = vkn.generate(SplitMix64(3), IdentifierPolicy.VALIDATOR)
+    assert vkn.is_checksum_valid(valid)
+
+    path = target / "transaction.jsonl"
+    lines = path.read_text(encoding="utf-8").splitlines()
+    record = json.loads(lines[0])
+    record["vkn"] = valid
+    lines[0] = json.dumps(record, ensure_ascii=False, separators=(",", ":"))
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    manifest_path = target / MANIFEST_FILENAME
+    document = json.loads(manifest_path.read_text(encoding="utf-8"))
+    sums = {}
+    for output in document["outputs"]:
+        if output["path"] == "transaction.jsonl":
+            output["sha256"] = file_digest(path)
+            output["bytes"] = path.stat().st_size
+        sums[output["path"]] = output["sha256"]
+    manifest_path.write_text(
+        json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    sums[MANIFEST_FILENAME] = file_digest(manifest_path)
+    (target / SUMS_FILENAME).write_text(render_sums(sums), encoding="utf-8")
+
+    report = verify_dataset(target)
+    assert report.checksum_valid_identifiers >= 1
+    assert any("checksum-valid VKN" in problem for problem in report.problems)
+
+
+def test_a_digit_run_inside_a_longer_token_is_not_a_candidate() -> None:
+    """The anchoring that stopped the false positive, asserted directly."""
+    from mintmark.manifest.verify import _CANDIDATE
+
+    assert _CANDIDATE.findall("1234567890") == ["1234567890"]
+    assert _CANDIDATE.findall("ab1234567890cd") == []
+    assert _CANDIDATE.findall("26bf03eefa2dec60a2033640190cf612") == []
+    assert _CANDIDATE.findall("TR990000000000000000000001") == ["TR990000000000000000000001"]

@@ -6,7 +6,13 @@
   "identifier_policy": "safe",
   "digests": {
     "customer.jsonl": "f968b01fcef05728dd86393d827f43e81d92548ecbab5ac015382cb4f807d2d5",
-    "transaction.jsonl": "a07418173ee0dc3803a02e63aaafe5e3abc1217d0b77af248cc1af505ac19104",
-    "transaction.labels.jsonl": "75899bb6060578e41e9d94c29adecb10a75ce41fce0afdb5bb8966550199cff8"
-  }
+    "transaction.jsonl": "050e2d4e38deb52bb8b83f8b259a39a0bd8f50256feeb17395a30a3f4689b6a1",
+    "transaction.labels.jsonl": "adac017f331f57e23ae9e2f13be9935e93b879d89b7ae5e65671b600bfdb9ca4"
+  },
+  "regenerated": [
+    {
+      "date": "2026-08-22",
+      "reason": "The special-category descriptor lexicons were expanded from a handful of hard-coded strings to 90 curated entries, because every sector pack's evaluation recipe draws at least 300 spans per label and a four-entry pool would meet that count while producing a dataset that repeats itself. Expanding a lexicon changes the draw for every subsequent index, so emitted bytes moved for a fixed seed. That is a major version event under this project's own rule. It is recorded rather than quietly refreshed, and it is only harmless here because nothing has been published: no manifest exists that this breaks."
+    }
+  ]
 }

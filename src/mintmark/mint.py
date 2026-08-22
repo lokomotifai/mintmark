@@ -462,27 +462,31 @@ def core_lexicon(name: str) -> list[str]:
     return result
 
 
-# Neutral-register descriptors for the special-category labels. Curated, brief,
-# and at category granularity: a class of thing, never a clinical detail, never
-# an accusation, never attached to a real organization.
-_DESCRIPTORS: dict[str, list[str]] = {
-    "HEALTH": ["kronik rahatsizlik", "gecici is goremezlik", "rutin kontrol", "istirahat raporu"],
-    "RELIGION": ["dini bayram izni", "inanc gerekçesiyle izin"],
-    "ETHNICITY": ["etnik koken beyani", "anadil tercihi"],
-    "POLITICAL": ["Yurttas Hareketi", "Ortak Gelecek Partisi"],
-    "SEXUAL_LIFE": ["ozel yasam beyani"],
-    "CRIMINAL": ["adli sicil kaydi sorgusu", "referans kontrolu"],
-    "BIOMETRIC_REF": ["parmak izi ile mesai kaydi", "yuz tanima ile giris"],
-    "UNION": ["Dayanisma Sendikasi", "Birlik Is Sendikasi", "Emek Sendikasi"],
-    "PERSON": ["Mehmet Demir", "Ayse Kaya", "Ali Yildiz"],
-    "ORG": ["Anka Lojistik", "Meridyen Teknoloji", "Toros Ticaret"],
-    "ADDRESS": ["Cumhuriyet Mahallesi", "Zafer Sokak"],
-    "DOB": ["1985-04-12", "1979-11-03"],
-}
+_DESCRIPTOR_CACHE: dict[str, list[str]] = {}
+
+
+def _load_descriptors() -> dict[str, list[str]]:
+    """Read the curated descriptor lexicon once.
+
+    These live in a reviewed YAML file rather than in this module, because every
+    sector pack's evaluation recipe draws at least 300 spans per label and a
+    handful of hard-coded strings would meet that count while producing a dataset
+    that repeats itself. A detector scored on that is scored on memorization.
+    """
+    if _DESCRIPTOR_CACHE:
+        return _DESCRIPTOR_CACHE
+
+    import yaml
+
+    path = Path(__file__).resolve().parent / "lexicons" / "data" / "special_descriptors.yaml"
+    document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    for label, entry in document["labels"].items():
+        _DESCRIPTOR_CACHE[label] = [str(v) for v in entry["values"]]
+    return _DESCRIPTOR_CACHE
 
 
 def core_descriptors(label: Label) -> list[str]:
-    values = _DESCRIPTORS.get(label.value)
+    values = _load_descriptors().get(label.value)
     if not values:
         raise MintError(
             f"no descriptor lexicon for {label.value}; a template may not draw an "
