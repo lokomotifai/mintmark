@@ -203,3 +203,23 @@ def test_the_quickstart_output_block_matches_what_verify_prints(tmp_path: Path) 
     english = ENGLISH.read_text(encoding="utf-8")
     for line in rendered.splitlines():
         assert line in english, f"README promises output that verify does not print: {line!r}"
+
+
+@pytest.mark.parametrize("path", [ENGLISH, TURKISH], ids=["en", "tr"])
+def test_each_readme_names_the_release_that_matches_this_version(path: Path) -> None:
+    """The badge and the package have to agree.
+
+    A README pointing at a tag nobody cut, or at an older one whose artifacts no
+    longer match this tree, is the likelier failure now that releases exist.
+    """
+    import re
+    import tomllib
+
+    version = tomllib.loads(
+        (Path(__file__).resolve().parents[2] / "pyproject.toml").read_text(encoding="utf-8")
+    )["project"]["version"]
+    text = path.read_text(encoding="utf-8")
+    named = set(re.findall(r"/releases/tag/v(\d+\.\d+\.\d+)", text))
+    assert named == {version}, (
+        f"{path.name} names releases {sorted(named)} while the package is {version}"
+    )
