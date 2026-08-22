@@ -11,6 +11,31 @@ output for a fixed set of inputs. A change that alters emitted bytes for a fixed
 seed is a major version event even when no signature changed, because it breaks
 the reproducibility of every published manifest.
 
+## 0.1.1 - 2026-08-22
+
+### Added
+
+- Publication to PyPI, over trusted publishing. The release workflow was written
+  and left disabled so its mechanics could be reviewed before they ever ran; this
+  enables it. No long-lived token is stored in this repository and none is passed
+  to a step, because PyPI verifies the workflow identity directly.
+
+  Three gates stand between a tag and a published release, and none of them is a
+  reviewer's attention. The tag must agree with the version in `pyproject.toml`
+  and with the version the package reports. The full gate runs first and
+  publication depends on it. The `pypi` environment requires the owner's approval
+  and admits only `v*` tags, so a push to main cannot reach it.
+
+### Notes
+
+The package is unchanged from 0.1.0. This version exists because publication is a
+repository change that needs a tag to carry it, and moving the 0.1.0 tag would
+have broken the immutability that repository's own tag ruleset enforces.
+
+A version already on PyPI cannot be replaced, and deleting a release does not
+free its number. The workflow refuses on a version mismatch rather than resolving
+one.
+
 ## 0.1.0 - 2026-08-22
 
 ### Changed, and it moved emitted bytes

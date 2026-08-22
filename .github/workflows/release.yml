@@ -1,36 +1,104 @@
-# DISABLED. This workflow does not run.
+# Publication to PyPI.
 #
-# Publication to PyPI and creation of a GitHub Release are external
-# authorization checkpoints. This file exists so that the release mechanics are
-# reviewable before they are ever executed, and so that enabling them is a
-# visible, single change rather than new machinery written under time pressure.
+# Publishing uses trusted publishing over OIDC. No long-lived token is stored in
+# this repository, and none is ever passed to a step: PyPI verifies the workflow
+# identity directly, so there is no credential that can leak from here.
 #
-# To enable, after the owner's recorded approval:
-#   1. restore the `on:` trigger below;
-#   2. configure PyPI trusted publishing for this repository;
-#   3. confirm the name freeze has cleared.
+# Three gates stand between a tag and a published release, and none of them is a
+# reviewer's attention:
 #
-# Publication uses trusted publishing over OIDC. No long-lived token is ever
-# stored in this repository.
-name: release (disabled)
+#   1. The tag must match the version in pyproject.toml. A tag that disagrees
+#      with the package it claims to publish is a mistake, not a release.
+#   2. The full gate runs first, and publication depends on it passing.
+#   3. The `pypi` environment requires the owner's approval, and its deployment
+#      branch policy admits only `v*` tags. A push to main cannot reach it.
+#
+# A version already on PyPI cannot be replaced. Deleting a release does not free
+# its version number. That is why this refuses on a mismatch rather than
+# resolving it.
+name: release
 
 on:
+  push:
+    tags: ["v*"]
   workflow_dispatch:
-    inputs:
-      confirm:
-        description: "This workflow is disabled pending authorization. Do not run."
-        required: true
 
 permissions:
   contents: read
 
 jobs:
-  blocked:
-    name: refuse to run
+  verify:
+    name: verify the tag matches the package
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - id: check
+        name: Compare the tag against pyproject and the package
+        run: |
+          set -euo pipefail
+          declared=$(uv run python -c "import tomllib,pathlib; print(tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['version'])")
+          imported=$(uv run python -c "import mintmark; print(mintmark.__version__)")
+          tag="${GITHUB_REF_NAME#v}"
+          echo "tag=$tag declared=$declared imported=$imported"
+          if [ "$tag" != "$declared" ] || [ "$declared" != "$imported" ]; then
+            echo "::error::tag $tag, pyproject $declared, package $imported. These must agree."
+            exit 1
+          fi
+          echo "version=$declared" >> "$GITHUB_OUTPUT"
+      - run: uv run ruff format --check .
+      - run: uv run ruff check .
+      - run: uv run mypy --strict src/
+      - run: uv run lint-imports
+      - run: uv run pytest
+      - run: uv run python tools/mdlint.py .
+
+  build:
+    name: build and check the distributions
+    needs: verify
     runs-on: ubuntu-latest
     steps:
-      - name: Refuse
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv build
+      - name: Generate the bill of materials
+        run: uv run cyclonedx-py environment --of JSON -o dist/sbom.json
+      - name: Confirm the built artifacts carry the tagged version
         run: |
-          echo "The release workflow is disabled pending the publication checkpoint."
-          echo "See the comment block at the top of this file."
-          exit 1
+          set -euo pipefail
+          test -f "dist/mintmark-${{ needs.verify.outputs.version }}-py3-none-any.whl"
+          test -f "dist/mintmark-${{ needs.verify.outputs.version }}.tar.gz"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: distributions
+          path: dist/
+
+  publish:
+    name: publish to PyPI
+    needs: [verify, build]
+    runs-on: ubuntu-latest
+    # The approval gate. Its deployment branch policy admits only `v*` tags.
+    environment:
+      name: pypi
+      url: https://pypi.org/project/mintmark/${{ needs.verify.outputs.version }}/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: distributions
+          path: dist/
+      - name: Remove everything that is not a distribution
+        # The bill of materials is a release asset, not something PyPI accepts.
+        run: rm -f dist/sbom.json
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          attestations: true

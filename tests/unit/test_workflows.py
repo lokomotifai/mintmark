@@ -75,13 +75,47 @@ def test_required_ci_covers_the_three_supported_platforms() -> None:
     )
 
 
-def test_release_workflow_stays_disabled() -> None:
-    """Publication is an external authorization checkpoint, not a merge decision."""
+def test_publication_stays_behind_a_recorded_authorization() -> None:
+    """Publication is an authorization checkpoint, not a merge decision.
+
+    This used to assert that the release workflow had no automatic trigger, which
+    was the only control available while the workflow refused to run at all. The
+    control now sits where it belongs: the publishing job runs inside a GitHub
+    environment whose approval is recorded and whose deployment branch policy
+    admits only tags. A trigger is a weak proxy for that and the proxy is no
+    longer what is being relied on, so the test checks the thing itself.
+    """
     document = load(WORKFLOW_DIR / "release.yml")
+    publish = document["jobs"]["publish"]
+
+    environment = publish.get("environment")
+    assert environment, "the publishing job runs outside any environment gate"
+    assert environment["name"] == "pypi", environment
+
     triggers = next(document[key] for key in ON_KEYS if key in document)
-    assert set(triggers) == {"workflow_dispatch"}, (
-        "the release workflow gained an automatic trigger; publication must stay "
-        "behind a recorded authorization"
+    assert set(triggers) <= {"push", "workflow_dispatch"}, triggers
+    assert triggers.get("push", {}).get("tags") == ["v*"], (
+        "publication may be reached from a version tag and from nothing else"
     )
+
+
+def test_only_the_publishing_job_may_mint_an_identity_token() -> None:
+    """`id-token: write` is what PyPI trusts. Nothing else needs it."""
+    document = load(WORKFLOW_DIR / "release.yml")
+    for name, job in document["jobs"].items():
+        writes_token = job.get("permissions", {}).get("id-token") == "write"
+        assert writes_token == (name == "publish"), (
+            f"job {name!r} sets id-token: write and is not the publishing job"
+        )
+
+
+def test_the_release_workflow_refuses_a_tag_that_disagrees_with_the_package() -> None:
+    """A version on PyPI cannot be replaced, so a mismatch has to fail closed.
+
+    Deleting a release does not free its number either, which is why the workflow
+    refuses rather than resolving the disagreement in either direction.
+    """
     body = (WORKFLOW_DIR / "release.yml").read_text(encoding="utf-8")
-    assert "exit 1" in body, "the disabled release workflow no longer refuses to run"
+    assert "GITHUB_REF_NAME" in body
+    assert "mintmark.__version__" in body
+    assert "exit 1" in body, "the version check no longer fails the run"
