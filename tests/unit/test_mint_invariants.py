@@ -262,8 +262,8 @@ def test_the_sweep_still_catches_a_planted_valid_identifier(minted: Path, tmp_pa
     import shutil
 
     from mintmark.api import verify as verify_dataset
-    from mintmark.identifiers import IdentifierPolicy, vkn
     from mintmark.engine.prng import SplitMix64
+    from mintmark.identifiers import IdentifierPolicy, vkn
     from mintmark.manifest import file_digest, render_sums
     from mintmark.manifest.document import MANIFEST_FILENAME
     from mintmark.manifest.sums import SUMS_FILENAME
