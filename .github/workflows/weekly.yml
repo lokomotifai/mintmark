@@ -31,17 +31,21 @@ jobs:
       # which is a fact worth seeing in the run log rather than an empty pass.
       - name: Taxonomy pin drift against hushmark upstream
         run: |
-          echo "not yet armed: the taxonomy pin lands in WP-04"
+          echo "not yet armed. The taxonomy pin lands in WP-04."
           echo "on drift this check opens an issue and never re-pins automatically"
 
       - name: TCMB bank code list, fictional-code confirmation
-        run: echo "not yet armed: the IBAN engine lands in WP-03"
+        run: |
+          echo "not yet armed. The IBAN engine lands in WP-03."
 
       - name: Institution denylist sources
-        run: echo "not yet armed: the denylist lands in WP-05"
+        run: |
+          echo "not yet armed. The denylist lands in WP-05."
 
       - name: Reserved-name rule against RFC 2606 and RFC 6761
-        run: echo "not yet armed: the email engine lands in WP-03"
+        run: |
+          echo "not yet armed. The email engine lands in WP-03."
 
       - name: Reproduce the committed reference golden run
-        run: echo "not yet armed: the golden run lands in WP-12"
+        run: |
+          echo "not yet armed. The golden run lands in WP-12."
