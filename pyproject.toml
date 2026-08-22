@@ -1,0 +1,121 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mintmark"
+version = "0.1.0.dev0"
+description = "Deterministic, fully synthetic, Turkish-first labeled datasets with a provenance manifest."
+requires-python = ">=3.12,<3.13"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{ name = "Mintmark contributors" }]
+keywords = ["synthetic-data", "turkish", "pii", "deterministic", "test-data"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Natural Language :: Turkish",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Software Development :: Testing",
+  "Typing :: Typed",
+]
+dependencies = [
+  "jsonschema>=4.23,<5",
+  "PyYAML>=6.0,<7",
+]
+
+[project.scripts]
+mintmark = "mintmark.cli:main"
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3,<9",
+  "hypothesis>=6.112,<7",
+  "ruff>=0.14,<0.15",
+  "mypy>=1.13,<2",
+  "import-linter>=2.1,<3",
+  "cyclonedx-bom>=5.1,<6",
+]
+
+# Package data ships with both the sdist and the wheel. tools/ and tests/ do not.
+[tool.hatch.build.targets.wheel]
+packages = ["src/mintmark"]
+
+# Data directories are added here by the milestone that creates them:
+# assets/tables -> WP-02, assets/denylist -> WP-05, schemas -> WP-06,
+# packs/example -> WP-12. WP-16's packaging manifest test asserts the final set.
+# No empty placeholder directories are created to satisfy this config early.
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "src/mintmark",
+  "tests",
+  "tools",
+  "LICENSE",
+  "NOTICE",
+  "CHANGELOG.md",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests", "tools"]
+
+[tool.ruff.lint]
+select = [
+  "E", "W",      # pycodestyle
+  "F",           # pyflakes
+  "I",           # isort
+  "N",           # pep8-naming
+  "UP",          # pyupgrade
+  "B",           # bugbear
+  "A",           # builtins shadowing
+  "C4",          # comprehensions
+  "PT",          # pytest style
+  "RET",         # return
+  "SIM",         # simplify
+  "TID",         # tidy imports
+  "PTH",         # pathlib
+  "RUF",         # ruff-specific
+]
+ignore = [
+  # The mint path uses explicit integer masking that reads clearer un-simplified.
+  "SIM108",
+]
+
+[tool.ruff.lint.flake8-tidy-imports]
+# Dynamic imports are forbidden in src/ so that the dependency graph stays
+# statically checkable by import-linter (PLAN.md section 11).
+ban-relative-imports = "parents"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src"]
+warn_unreachable = true
+disallow_any_explicit = false
+disallow_any_generics = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+show_error_codes = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = "-ra --strict-markers --strict-config"
+markers = [
+  "golden: byte-level determinism checks against committed expected output",
+  "adversarial: malformed input that must fail closed",
+]
+filterwarnings = ["error"]

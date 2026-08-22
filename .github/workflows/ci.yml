@@ -1,0 +1,66 @@
+# Required checks. Every job here runs offline after dependency bootstrap.
+# Any job needing network at run time belongs in weekly.yml, labeled as such.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static:
+    name: format, lint, types, imports, prose
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run ruff format --check .
+      - run: uv run ruff check .
+      - run: uv run mypy --strict src/
+      - run: uv run lint-imports
+      - run: uv run python tools/mdlint.py .
+
+  canary:
+    name: private-corpus canary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      # The canary is never committed. It is supplied here as a repository
+      # secret and the committed digest proves the right string was used.
+      # A missing secret fails this job by design: a canary check that
+      # silently skips is worse than no check at all.
+      - name: Scan tree for private-corpus canary
+        env:
+          MINTMARK_CANARY: ${{ secrets.MINTMARK_CANARY }}
+        run: uv run python tools/canary.py .
+
+  tests:
+    name: tests on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # The three platforms the determinism claim covers. Widening this
+        # matrix widens the claim, so it changes only by an explicit decision.
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run pytest -ra

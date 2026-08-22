@@ -1,0 +1,47 @@
+# Cadence checks. THIS WORKFLOW REQUIRES NETWORK ACCESS at run time and is
+# deliberately separated from the required checks in ci.yml for that reason.
+#
+# Findings land as issues and as Surprises and Discoveries entries in the
+# build's plan. A run that finds nothing records that it ran and found nothing;
+# silence is not evidence.
+name: weekly (network)
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  drift:
+    name: normative source drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+
+      # Each check below is wired by the milestone that creates the asset it
+      # watches. Until then the step records that the check is not yet armed,
+      # which is a fact worth seeing in the run log rather than an empty pass.
+      - name: Taxonomy pin drift against hushmark upstream
+        run: |
+          echo "not yet armed: the taxonomy pin lands in WP-04"
+          echo "on drift this check opens an issue and never re-pins automatically"
+
+      - name: TCMB bank code list, fictional-code confirmation
+        run: echo "not yet armed: the IBAN engine lands in WP-03"
+
+      - name: Institution denylist sources
+        run: echo "not yet armed: the denylist lands in WP-05"
+
+      - name: Reserved-name rule against RFC 2606 and RFC 6761
+        run: echo "not yet armed: the email engine lands in WP-03"
+
+      - name: Reproduce the committed reference golden run
+        run: echo "not yet armed: the golden run lands in WP-12"

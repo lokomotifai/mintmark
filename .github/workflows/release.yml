@@ -1,0 +1,36 @@
+# DISABLED. This workflow does not run.
+#
+# Publication to PyPI and creation of a GitHub Release are external
+# authorization checkpoints. This file exists so that the release mechanics are
+# reviewable before they are ever executed, and so that enabling them is a
+# visible, single change rather than new machinery written under time pressure.
+#
+# To enable, after the owner's recorded approval:
+#   1. restore the `on:` trigger below;
+#   2. configure PyPI trusted publishing for this repository;
+#   3. confirm the name freeze has cleared.
+#
+# Publication uses trusted publishing over OIDC. No long-lived token is ever
+# stored in this repository.
+name: release (disabled)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "This workflow is disabled pending authorization. Do not run."
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  blocked:
+    name: refuse to run
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refuse
+        run: |
+          echo "The release workflow is disabled pending the publication checkpoint."
+          echo "See the comment block at the top of this file."
+          exit 1

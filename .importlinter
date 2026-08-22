@@ -1,0 +1,93 @@
+; Module dependency direction, enforced in required CI.
+; PLAN.md section 11 states the allowed direction as "A -> B means A may import B":
+;
+;     cli          -> packs, engine, emit, manifest, annotate, identifiers
+;     packs        -> engine
+;     identifiers  -> engine
+;     annotate     -> engine
+;     emit         -> annotate, engine
+;     manifest     -> emit, engine
+;
+; Cycles are forbidden. `engine` imports only the standard library.
+;
+; Layers are declared optional with parentheses so that this contract is
+; enforceable from WP-00 onward and tightens automatically as each owning
+; milestone materializes its module. No empty placeholder package is created
+; to satisfy the contract early.
+
+[importlinter]
+root_package = mintmark
+include_external_packages = True
+
+[importlinter:contract:layers]
+name = Module layers follow the declared dependency direction
+type = layers
+layers =
+    (cli)
+    (manifest)
+    (emit)
+    (annotate) : (identifiers) : (packs)
+    (engine)
+
+; The forbidden contracts below name modules that do not exist yet. Unlike
+; layers, forbidden contracts have no optional syntax, so each one is
+; activated by the milestone that creates its source module:
+;
+;     engine-is-stdlib-only   WP-01
+;     leaf-modules-narrow     WP-03 (identifiers), WP-04 (annotate), WP-06 (packs)
+;     emit-narrow             WP-09
+;     manifest-narrow         WP-10
+;
+; Uncomment a contract in its owning milestone, never earlier and never later.
+; WP-14's gate asserts that every contract below is active.
+;
+; [importlinter:contract:engine-is-stdlib-only]
+; name = engine imports no other mintmark module
+; type = forbidden
+; source_modules =
+;     mintmark.engine
+; forbidden_modules =
+;     mintmark.cli
+;     mintmark.manifest
+;     mintmark.emit
+;     mintmark.annotate
+;     mintmark.identifiers
+;     mintmark.packs
+;     mintmark.lexicons
+; allow_indirect_imports = False
+
+; [importlinter:contract:emit-narrow]
+; name = emit imports only annotate and engine
+; type = forbidden
+; source_modules =
+;     mintmark.emit
+; forbidden_modules =
+;     mintmark.cli
+;     mintmark.manifest
+;     mintmark.identifiers
+;     mintmark.packs
+; allow_indirect_imports = False
+
+; [importlinter:contract:manifest-narrow]
+; name = manifest imports only emit and engine
+; type = forbidden
+; source_modules =
+;     mintmark.manifest
+; forbidden_modules =
+;     mintmark.cli
+;     mintmark.identifiers
+;     mintmark.packs
+; allow_indirect_imports = False
+
+; [importlinter:contract:leaf-modules-narrow]
+; name = packs, identifiers and annotate import only engine
+; type = forbidden
+; source_modules =
+;     mintmark.packs
+;     mintmark.identifiers
+;     mintmark.annotate
+; forbidden_modules =
+;     mintmark.cli
+;     mintmark.manifest
+;     mintmark.emit
+; allow_indirect_imports = False
