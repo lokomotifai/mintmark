@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+from mintmark.annotate.render import RenderError, Resolvers, render
 from mintmark.annotate.sidecar import (
     SidecarRecord,
     text_digest,
@@ -34,6 +35,8 @@ __all__ = [
     "TAXONOMY_NAME",
     "TAXONOMY_VERSION",
     "Label",
+    "RenderError",
+    "Resolvers",
     "SidecarRecord",
     "Span",
     "SpanRecorder",
@@ -42,6 +45,7 @@ __all__ = [
     "parse_label",
     "pin",
     "pin_digest",
+    "render",
     "text_digest",
     "verify_alignment",
     "write_sidecar",
