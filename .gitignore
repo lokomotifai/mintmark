@@ -1,0 +1,27 @@
+# Owner-only planning material. Never enters git history.
+# Repository standard section 7.1: owner-only planning documents are
+# gitignored by name.
+PLAN.md
+briefs/
+research/
+corpus/
+
+# Build and run output
+dist/
+build/
+*.egg-info/
+
+# Environments and caches
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# OS
+.DS_Store
+
+# Minted output directories produced during development
+demo-run/
+*-run/
