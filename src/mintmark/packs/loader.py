@@ -19,7 +19,9 @@ worked just moves the guessing somewhere else.
 
 from __future__ import annotations
 
+import stat
 from dataclasses import dataclass
+from itertools import islice
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +30,10 @@ from yaml.constructor import ConstructorError
 from yaml.nodes import MappingNode, Node
 
 MERGE_TAG = "tag:yaml.org,2002:merge"
+MAX_YAML_BYTES = 1 << 20
+MAX_YAML_DEPTH = 64
+MAX_YAML_NODES = 100_000
+MAX_YAML_SCALAR_CHARS = 256_000
 
 
 class PackError(Exception):
@@ -56,6 +62,11 @@ class StrictLoader(yaml.SafeLoader):
     merge keys are gone by the time a parsed document exists, so a check written
     against the result could never see them.
     """
+
+    def __init__(self, stream: Any) -> None:
+        super().__init__(stream)
+        self._compose_depth = 0
+        self._composed_nodes = 0
 
     def construct_mapping(self, node: MappingNode, deep: bool = False) -> dict[Any, Any]:
         seen: set[Any] = set()
@@ -110,6 +121,29 @@ class StrictLoader(yaml.SafeLoader):
             )
 
         event = self.peek_event()  # type: ignore[no-untyped-call]
+        if self._compose_depth >= MAX_YAML_DEPTH:
+            raise ConstructorError(
+                None,
+                None,
+                f"YAML nesting exceeds the supported depth of {MAX_YAML_DEPTH}",
+                getattr(event, "start_mark", None),
+            )
+        self._composed_nodes += 1
+        if self._composed_nodes > MAX_YAML_NODES:
+            raise ConstructorError(
+                None,
+                None,
+                f"YAML node count exceeds the supported limit of {MAX_YAML_NODES}",
+                getattr(event, "start_mark", None),
+            )
+        scalar = getattr(event, "value", None)
+        if isinstance(scalar, str) and len(scalar) > MAX_YAML_SCALAR_CHARS:
+            raise ConstructorError(
+                None,
+                None,
+                f"YAML scalar exceeds the supported length of {MAX_YAML_SCALAR_CHARS}",
+                getattr(event, "start_mark", None),
+            )
         anchor = getattr(event, "anchor", None)
         if anchor is not None:
             raise ConstructorError(
@@ -119,7 +153,11 @@ class StrictLoader(yaml.SafeLoader):
                 "reused elsewhere without a reader seeing it",
                 getattr(event, "start_mark", None),
             )
-        return super().compose_node(parent, index)
+        self._compose_depth += 1
+        try:
+            return super().compose_node(parent, index)
+        finally:
+            self._compose_depth -= 1
 
 
 def load_yaml(path: Path) -> dict[str, Any]:
@@ -129,14 +167,36 @@ def load_yaml(path: Path) -> dict[str, Any]:
     a list at the root, is refused.
     """
     try:
-        raw = path.read_text(encoding="utf-8")
+        metadata = path.lstat()
+        if not stat.S_ISREG(metadata.st_mode):
+            raise PackError(
+                path,
+                "file",
+                "non-regular-file",
+                "pack declarations must be regular files, not links or special files",
+            )
+        with path.open("rb") as handle:
+            encoded = handle.read(MAX_YAML_BYTES + 1)
+    except PackError:
+        raise
     except OSError as exc:
         raise PackError(path, "file", "unreadable", str(exc)) from exc
+    if len(encoded) > MAX_YAML_BYTES:
+        raise PackError(
+            path,
+            "file",
+            "yaml-byte-limit",
+            f"YAML files may not exceed {MAX_YAML_BYTES} bytes",
+        )
+    try:
+        raw = encoded.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise PackError(path, "file", "invalid-utf8", str(exc)) from exc
 
     _reject_tab_indentation(path, raw)
 
     try:
-        documents = list(yaml.compose_all(raw, Loader=StrictLoader))
+        documents = list(islice(yaml.compose_all(raw, Loader=StrictLoader), 2))
     except ConstructorError as exc:
         raise PackError(path, _mark(exc), "strict-yaml", str(exc.problem or exc)) from exc
     except yaml.YAMLError as exc:
@@ -149,7 +209,7 @@ def load_yaml(path: Path) -> dict[str, Any]:
             path,
             "document 2",
             "multiple-documents",
-            f"{len(documents)} documents in one file; only the first would ever be read",
+            "multiple documents in one file; only the first would ever be read",
         )
 
     try:

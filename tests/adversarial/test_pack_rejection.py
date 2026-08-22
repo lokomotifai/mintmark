@@ -18,7 +18,7 @@ import jsonschema
 import pytest
 import yaml
 
-from mintmark.packs.loader import PackError, load_yaml
+from mintmark.packs.loader import MAX_YAML_BYTES, MAX_YAML_DEPTH, PackError, load_yaml
 from mintmark.packs.semver import parse_range
 
 FIXTURES = Path(__file__).resolve().parent / "packs"
@@ -114,6 +114,39 @@ def test_a_pack_error_carries_structured_fields_not_only_a_message() -> None:
 def test_a_missing_file_is_refused_rather_than_treated_as_empty() -> None:
     with pytest.raises(PackError, match="unreadable"):
         load_yaml(FIXTURES / "valid" / "does-not-exist.yaml")
+
+
+def test_oversized_yaml_is_rejected_before_parsing(tmp_path: Path) -> None:
+    path = tmp_path / "large.yaml"
+    path.write_bytes(b"value: " + b"a" * MAX_YAML_BYTES)
+
+    with pytest.raises(PackError) as caught:
+        load_yaml(path)
+
+    assert caught.value.rule == "yaml-byte-limit"
+
+
+def test_deep_yaml_is_rejected_by_the_parser_budget(tmp_path: Path) -> None:
+    path = tmp_path / "deep.yaml"
+    path.write_text(
+        "value: " + "[" * MAX_YAML_DEPTH + "0" + "]" * MAX_YAML_DEPTH,
+        encoding="utf-8",
+    )
+
+    with pytest.raises(PackError, match="nesting exceeds"):
+        load_yaml(path)
+
+
+def test_yaml_symlink_is_not_followed(tmp_path: Path) -> None:
+    target = tmp_path / "outside.yaml"
+    target.write_text("secret: value\n", encoding="utf-8")
+    link = tmp_path / "pack.yaml"
+    link.symlink_to(target)
+
+    with pytest.raises(PackError) as caught:
+        load_yaml(link)
+
+    assert caught.value.rule == "non-regular-file"
 
 
 @pytest.mark.parametrize(
