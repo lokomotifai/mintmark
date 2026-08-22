@@ -6,3 +6,4 @@ locale: en-US
 allowed_identifier_policies: [safe]
 description: A minimal valid pack used as the baseline for adversarial fixtures.
 description_tr: Dusman fixture'lari icin taban olarak kullanilan gecerli paket.
+dataset_license: CC-BY-4.0

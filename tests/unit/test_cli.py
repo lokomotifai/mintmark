@@ -222,9 +222,13 @@ def test_verify_json_payload_has_the_documented_shape(tmp_path: Path, capsys) ->
         "documents_checked",
         "spans_checked",
         "taxonomy_pin",
+        "dataset_license",
+        "attribution",
         "problems",
     }
     assert payload["ok"] is True
+    assert payload["dataset_license"] == "CC-BY-4.0"
+    assert payload["attribution"].startswith("mintmark-example ")
     assert payload["problems"] == []
 
 

@@ -1,0 +1,34 @@
+# Citation metadata, in Citation File Format 1.2.0.
+# GitHub renders this as "Cite this repository".
+#
+# No release has been published and there is no DOI. `version` names the
+# current unreleased version so a citation is unambiguous about what it saw.
+#
+# `license` is the code license. Datasets minted from this repository carry
+# CC-BY-4.0, which is recorded in LICENSE-DATASETS.md and written into every
+# manifest. The format has one license field, so this is the one it holds.
+
+cff-version: 1.2.0
+message: If you use this work, please cite it as below.
+title: 'Mintmark: deterministic synthetic Turkish labeled datasets'
+abstract: A generation engine for fully synthetic, Turkish-first labeled datasets. Every value
+  is derived from a seed by a deterministic function with no model anywhere in the generation
+  path, spans are labeled against a pinned eighteen-label taxonomy, and each dataset carries
+  a manifest that lets anyone re-derive the identical bytes. Code is Apache-2.0; datasets
+  minted from any pack in this family carry CC-BY-4.0.
+type: software
+version: 0.1.0.dev4
+authors:
+- family-names: Guner
+  given-names: Fatih
+  alias: fatihguner
+repository-code: https://github.com/lokomotifai/mintmark
+license: Apache-2.0
+keywords:
+- synthetic data
+- Turkish
+- named entity recognition
+- KVKK
+- personal data detection
+- reproducibility
+- provenance

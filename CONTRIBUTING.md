@@ -1,5 +1,7 @@
 # Contributing
 
+<sub><a href="CONTRIBUTING.tr.md">Türkçe</a></sub>
+
 Thank you for considering a contribution. This project is small and its review
 discipline is deliberate, so read this before opening a pull request.
 
@@ -42,7 +44,8 @@ reason. An exemption without a reason is a lint error.
 ## The Turkish mirror
 
 `README.md` is canonical and `README.tr.md` is a full mirror, not a summary. A
-change to one without the other fails review. If you are not comfortable writing
+change to one without the other fails review. The same rule covers every other
+`.tr.md` mirror in this repository. If you are not comfortable writing
 the Turkish, say so in the pull request and it will be handled; do not leave the
 mirror stale.
 

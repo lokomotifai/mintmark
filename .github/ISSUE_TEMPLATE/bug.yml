@@ -1,0 +1,63 @@
+name: Bug report
+description: Report incorrect behavior in the engine.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A mint is a pure function of its declared inputs, so almost every defect here reproduces exactly. A report carrying a seed and a manifest can usually be reproduced on the first attempt; a report without them usually cannot be reproduced at all.
+
+        Do not paste real personal data, credentials, or undisclosed vulnerability details. Use private vulnerability reporting for security issues.
+
+        You may write in Turkish. Türkçe yazabilirsiniz.
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Preflight
+      options:
+        - label: I searched existing issues.
+          required: true
+        - label: This report contains no real personal data, no credentials, and no undisclosed vulnerability details.
+          required: true
+        - label: I have read SUPPORT.md and this is not a question about my own pipeline or compliance position.
+          required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: The exact command
+      description: With the pack, recipe, seed, identifier policy, and output format.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: manifest
+    attributes:
+      label: MINTMARK.json
+      description: The manifest from the run, or the parts you can share. It carries the engine version, pack digest, recipe, and seed.
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: observed
+    attributes:
+      label: What you observed
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: |
+        mintmark --version:
+        Operating system / architecture:
+        Pack:
+        Recipe / seed / identifier policy / format:
+    validations:
+      required: true

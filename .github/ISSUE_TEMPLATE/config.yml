@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability privately
+    url: https://github.com/lokomotifai/mintmark/security/advisories/new
+    about: Never disclose vulnerability details in a public issue.
+  - name: Read the support boundary first
+    url: https://github.com/lokomotifai/mintmark/blob/main/SUPPORT.md
+    about: One maintainer, no service level. This says what can and cannot be answered here.
+  - name: What this project claims under KVKK
+    url: https://github.com/lokomotifai/mintmark/blob/main/docs/kvkk.md
+    about: Read this before opening an issue about compliance. It is not legal advice.
+  - name: Sorularınızı Türkçe sorabilirsiniz
+    url: https://github.com/lokomotifai/mintmark/blob/main/SUPPORT.tr.md
+    about: Konu ve çekme isteklerinde Türkçe yazabilirsiniz. Depo metinlerinin esas dili İngilizcedir.

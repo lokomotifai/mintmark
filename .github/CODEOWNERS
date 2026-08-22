@@ -1,0 +1,32 @@
+# Repository ownership for mintmark.
+#
+# The repository-wide owner is explicit so GitHub requests the maintainer's
+# review for every contribution. Required code-owner approval is enabled once a
+# second maintainer can give an independent review; until then the compensating
+# control is required CI, not the reviewer. See GOVERNANCE.md.
+
+* @fatihguner
+
+# Governance, security, and licensing surfaces.
+/.github/ @fatihguner
+/SECURITY.md @fatihguner
+/SECURITY.tr.md @fatihguner
+/GOVERNANCE.md @fatihguner
+/GOVERNANCE.tr.md @fatihguner
+/MAINTAINERS.md @fatihguner
+/CODE_OF_CONDUCT.md @fatihguner
+/CODE_OF_CONDUCT.tr.md @fatihguner
+/TRADEMARKS.md @fatihguner
+/LICENSE @fatihguner
+/LICENSE-DATASETS.md @fatihguner
+/NOTICE @fatihguner
+/docs/kvkk.md @fatihguner
+/docs/kvkk.tr.md @fatihguner
+/assets/brand/ @fatihguner
+
+# Surfaces where a change moves emitted bytes or a published claim.
+/src/mintmark/engine/ @fatihguner
+/src/mintmark/identifiers/ @fatihguner
+/src/mintmark/manifest/ @fatihguner
+/schemas/ @fatihguner
+/tests/golden/ @fatihguner

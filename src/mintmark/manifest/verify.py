@@ -45,6 +45,8 @@ class VerifyReport:
     documents_checked: int = 0
     spans_checked: int = 0
     taxonomy_pin: str = ""
+    dataset_license: str = "unknown"
+    attribution: str = ""
     problems: list[str] = dataclass_field(default_factory=list)
 
     @property
@@ -62,6 +64,8 @@ class VerifyReport:
             "documents_checked": self.documents_checked,
             "spans_checked": self.spans_checked,
             "taxonomy_pin": self.taxonomy_pin,
+            "dataset_license": self.dataset_license,
+            "attribution": self.attribution,
             "problems": list(self.problems),
         }
 
@@ -75,6 +79,8 @@ class VerifyReport:
             f"checksum-valid identifiers found: {self.checksum_valid_identifiers}",
             f"taxonomy: {self.taxonomy_pin}",
             f"label alignment: {self.documents_checked} documents, {self.spans_checked} spans",
+            f"dataset license: {self.dataset_license}",
+            f"attribution: {self.attribution}",
         ]
         lines.extend(f"PROBLEM: {problem}" for problem in self.problems)
         return "\n".join(lines)
@@ -105,6 +111,11 @@ def verify(
         return report
 
     report.identifier_policy = document["identifier_policy"]
+    # Reported rather than merely stored. Somebody running verify on a dataset
+    # they downloaded is exactly the person who needs to know the terms, and the
+    # credit line they would otherwise have to assemble by hand.
+    report.dataset_license = document["license"]["datasets"]
+    report.attribution = document["license"]["attribution"]
     taxonomy = document["taxonomy"]
     report.taxonomy_pin = (
         f"{taxonomy['name']} v{taxonomy['version']}, pin {taxonomy['pin_digest'][:12]}"

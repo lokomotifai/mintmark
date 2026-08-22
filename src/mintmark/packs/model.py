@@ -148,6 +148,7 @@ class Pack:
     allowed_identifier_policies: tuple[str, ...]
     description: str
     description_tr: str
+    dataset_license: str
     record_types: tuple[RecordType, ...]
     recipes: dict[str, Recipe]
     template_sets: dict[str, tuple[TemplateEntry, ...]]
@@ -217,6 +218,7 @@ def load_pack(root: Path, *, core_version: str | None = None) -> Pack:
         allowed_identifier_policies=tuple(manifest["allowed_identifier_policies"]),
         description=manifest["description"],
         description_tr=manifest["description_tr"],
+        dataset_license=manifest["dataset_license"],
         record_types=record_types,
         recipes=recipes,
         template_sets=template_sets,

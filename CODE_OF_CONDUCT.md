@@ -1,5 +1,7 @@
 # Mintmark code of conduct
 
+<sub><a href="CODE_OF_CONDUCT.tr.md">Türkçe</a></sub>
+
 ## Our pledge
 
 We as members, contributors, and leaders pledge to make participation in our

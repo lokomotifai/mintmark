@@ -1,0 +1,26 @@
+# Dependency updates.
+#
+# Grouped and monthly rather than per-package and weekly: a one-maintainer
+# project that opens more update pull requests than it can review has replaced a
+# supply-chain control with a backlog.
+
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "ci"
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    groups:
+      python:
+        patterns: ["*"]
+    commit-message:
+      prefix: "deps"

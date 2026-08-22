@@ -25,7 +25,14 @@ from pathlib import Path
 from typing import Any
 
 MANIFEST_FILENAME = "MINTMARK.json"
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+
+# Schema 2 added the license block. A dataset leaves this repository as a
+# directory of files, and before schema 2 nothing in that directory said under
+# what terms it could be used. An attribution requirement that a consumer cannot
+# find in the artifact is not a requirement, so the terms travel with the data
+# and are checksummed along with everything else.
+CODE_LICENSE = "Apache-2.0"
 
 # Fixed text, defined once so that the writer and the verifier cannot drift.
 VALIDATOR_WARNING = (
@@ -130,6 +137,8 @@ class Manifest:
     entity_coverage: dict[str, int]
     created_utc: str
     invocation: str
+    dataset_license: str
+    attribution: str
     overrides: dict[str, Any] = dataclass_field(default_factory=dict)
 
     def to_json(self) -> dict[str, Any]:
@@ -157,6 +166,11 @@ class Manifest:
         if self.identifier_policy == "validator":
             document["validator_warning"] = VALIDATOR_WARNING
 
+        document["license"] = {
+            "code": CODE_LICENSE,
+            "datasets": self.dataset_license,
+            "attribution": self.attribution,
+        }
         document["taxonomy"] = dict(self.taxonomy)
         document["outputs"] = [output.to_json() for output in self.outputs]
         document["stats"] = {

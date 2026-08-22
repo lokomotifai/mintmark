@@ -15,6 +15,19 @@ the reproducibility of every published manifest.
 
 ### Changed, and it moved emitted bytes
 
+- The manifest gained a `license` block and its schema version went to 2. A
+  dataset leaves this project as a directory of files, and before this there was
+  nothing in that directory saying under what terms it could be used. An
+  attribution requirement a consumer cannot find in the artifact is not a
+  requirement. The block carries the code license, the dataset license the pack
+  declared, and a ready credit line; `verify` prints all three, and stripping the
+  block fails verification like any other tampering.
+- `pack.yaml` requires `dataset_license`, from a closed set. The engine writes
+  this into every manifest it produces, and a free-text field would put a typo,
+  or terms nobody vetted, onto a published artifact. Declaring it changes the
+  pack digest, which changes emitted bytes for a fixed seed, which is why every
+  pack in the family took a version bump alongside it.
+
 - The special-category descriptor lexicons moved into a curated YAML file and
   grew to 90 entries. Expanding a lexicon changes the draw for every subsequent
   index, so emitted bytes moved for a fixed seed. **Under this project's own rule
@@ -27,6 +40,20 @@ the reproducibility of every published manifest.
   `[?special: ...]` and the rate comes from the recipe.
 
 ### Added
+
+- Turkish mirrors of every community document: contributing, conduct,
+  governance, security, and support, each linked from its original and held in
+  step by a test. The audience for this project reads Turkish, and a README
+  mirror alone left a contributor reading the project's own rules in a second
+  language. The conduct mirror records that it is our own rendering rather than
+  the official one, because the Contributor Covenant publishes Turkish at 2.0
+  while this repository adapts 2.1.
+- `docs/kvkk.md` and its Turkish mirror: what this project produces and what it
+  does not claim under law 6698, with a table mapping the taxonomy's
+  special-category labels to the categories the law enumerates, and naming the
+  three that no label covers.
+- `LICENSE-DATASETS.md`, `CITATION.cff`, issue and pull request templates,
+  `CODEOWNERS`, and grouped monthly dependency updates.
 
 - The `derived:flag_unless` rule, which turns a sentinel enum value into a
   boolean so a row can carry both which anomaly it is and whether it is one,

@@ -118,6 +118,8 @@ identifier policy: safe (confirmed)
 checksum-valid identifiers found: 0
 taxonomy: hushmark-tr v0.1, pin af11b31e4916
 label alignment: 100 documents, 81 spans
+dataset license: CC-BY-4.0
+attribution: mintmark-example 0.1.0 reference dataset (recipe demo, seed 42), lokomotifai, licensed CC-BY-4.0
 ```
 
 A test asserts that block against what `verify` actually prints, so this example
@@ -331,6 +333,14 @@ product definition.
 ## License and trademark
 
 Code is Apache-2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+Datasets minted by this engine carry the terms their pack declares, written into
+`MINTMARK.json` and printed by `verify`. Every pack in this family declares
+**CC BY 4.0**: any use including commercial, with credit. See
+[LICENSE-DATASETS.md](LICENSE-DATASETS.md).
+
+What a synthetic dataset does and does not mean under Turkish data
+protection law is set out in [docs/kvkk.md](docs/kvkk.md).
 
 The license grants no right to the Mintmark name or logo. See
 [TRADEMARKS.md](TRADEMARKS.md) for what fair community use covers.

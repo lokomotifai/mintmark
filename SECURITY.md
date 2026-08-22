@@ -1,5 +1,7 @@
 # Security policy
 
+<sub><a href="SECURITY.tr.md">Türkçe</a></sub>
+
 ## Report privately
 
 Use GitHub private vulnerability reporting on this repository's security tab.

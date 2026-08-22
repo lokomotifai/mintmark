@@ -1,5 +1,7 @@
 # Support
 
+<sub><a href="SUPPORT.tr.md">Türkçe</a></sub>
+
 ## Choose the right route
 
 | You want to | Use |

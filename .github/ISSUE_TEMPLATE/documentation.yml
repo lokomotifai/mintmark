@@ -1,0 +1,33 @@
+name: Documentation
+description: Report something wrong, missing, or unclear in the documentation.
+title: "[Docs]: "
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        README.md is canonical and every .tr.md file is a full mirror. If one side is wrong, say whether the other side is wrong too.
+
+        You may write in Turkish. Türkçe yazabilirsiniz.
+  - type: input
+    id: where
+    attributes:
+      label: Which file, and which section
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is wrong, missing, or unclear
+    validations:
+      required: true
+  - type: dropdown
+    id: mirror
+    attributes:
+      label: Does the Turkish or English mirror have the same problem?
+      options:
+        - "Yes, both sides"
+        - "No, only the file named above"
+        - "I did not check"
+    validations:
+      required: true

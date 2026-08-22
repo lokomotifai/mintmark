@@ -409,3 +409,104 @@ def test_a_malformed_age_window_names_the_rule_it_broke(
     with pytest.raises(PackError) as caught:
         load_pack(pack)
     assert caught.value.rule == rule, caught.value.rule
+
+
+# The terms travel with the data.
+
+
+def test_every_manifest_carries_the_licence_the_pack_declared(minted: Path) -> None:
+    """A dataset leaves this project as a directory of files.
+
+    Before the manifest carried a license block, nothing in that directory said
+    under what terms the data could be used. An attribution requirement a
+    consumer cannot find in the artifact is not a requirement.
+    """
+    document = json.loads((minted / "MINTMARK.json").read_text(encoding="utf-8"))
+    assert document["license"]["code"] == "Apache-2.0"
+    assert document["license"]["datasets"] == "CC-BY-4.0"
+    assert document["mintmark"]["manifest_schema_version"] == 2
+
+
+def test_the_attribution_line_names_the_dataset_uniquely(tmp_path: Path) -> None:
+    """Two runs differing in recipe or seed are different datasets."""
+    first = tmp_path / "a"
+    second = tmp_path / "b"
+    mint(pack=PACK, recipe="demo", seed=42, out=first, invocation="pytest")
+    mint(pack=PACK, recipe="demo", seed=43, out=second, invocation="pytest")
+
+    def line(where: Path) -> str:
+        return json.loads((where / "MINTMARK.json").read_text(encoding="utf-8"))["license"][
+            "attribution"
+        ]
+
+    assert "seed 42" in line(first)
+    assert "seed 43" in line(second)
+    assert line(first) != line(second)
+    for part in ("mintmark-example", "recipe demo", "lokomotifai", "CC-BY-4.0"):
+        assert part in line(first), part
+
+
+def test_verify_reports_the_terms_to_whoever_runs_it(minted: Path) -> None:
+    from mintmark.api import verify as verify_dataset
+
+    report = verify_dataset(minted)
+    assert report.dataset_license == "CC-BY-4.0"
+    assert report.attribution
+    rendered = report.render()
+    assert "dataset license: CC-BY-4.0" in rendered
+    assert "attribution: " in rendered
+
+
+def test_a_manifest_with_the_licence_block_stripped_fails_verification(
+    minted: Path, tmp_path: Path
+) -> None:
+    """Stripping the terms is tampering, and is caught like any other tampering."""
+    import shutil
+
+    from mintmark.api import verify as verify_dataset
+    from mintmark.manifest.document import MANIFEST_FILENAME
+
+    target = tmp_path / "stripped"
+    shutil.copytree(minted, target)
+    path = target / MANIFEST_FILENAME
+    document = json.loads(path.read_text(encoding="utf-8"))
+    del document["license"]
+    path.write_text(json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+    report = verify_dataset(target)
+    assert not report.ok
+    assert any("license" in problem for problem in report.problems), report.problems
+
+
+@pytest.mark.parametrize(
+    ("declared", "reason"),
+    [(None, "omitted"), ("MIT", "not a data license"), ("CC-BY-SA-4.0", "not on the list")],
+)
+def test_a_pack_may_not_invent_its_own_dataset_terms(
+    tmp_path: Path, declared: object, reason: str
+) -> None:
+    """The engine writes this into every manifest it produces.
+
+    A free-text field would put a typo, or terms nobody vetted, onto a published
+    artifact. The enum is the point.
+    """
+    import shutil
+
+    import yaml
+
+    from mintmark.packs.model import PackError, load_pack
+
+    pack = tmp_path / f"pack-{reason.replace(' ', '-')}"
+    shutil.copytree(CONFORMANCE, pack)
+    manifest = pack / "pack.yaml"
+    document = yaml.safe_load(manifest.read_text(encoding="utf-8"))
+    if declared is None:
+        del document["dataset_license"]
+    else:
+        document["dataset_license"] = declared
+    manifest.write_text(
+        yaml.safe_dump(document, allow_unicode=True, sort_keys=False), encoding="utf-8"
+    )
+
+    with pytest.raises(PackError):
+        load_pack(pack)

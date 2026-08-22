@@ -9,3 +9,4 @@ description_tr: Dusman fixture'lari icin taban olarak kullanilan gecerli paket.
 derived:
   <<: {inherited: 1}
   own: 2
+dataset_license: CC-BY-4.0

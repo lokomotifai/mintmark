@@ -6,3 +6,4 @@ locale: tr-TR
 allowed_identifier_policies: [safe, validator]
 description: Conformance fixture exercising every feature the sector pack contract declares.
 description_tr: Sektor paketi sozlesmesinin her ozelligini calistiran uygunluk paketi.
+dataset_license: CC-BY-4.0

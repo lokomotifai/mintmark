@@ -1,0 +1,22 @@
+name: Question
+description: Ask how something is meant to work.
+title: "[Question]: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Some questions cannot be answered here, and SUPPORT.md says which. Help with your own pipeline, your own detector, or your own compliance position is out of scope, and whether synthetic data satisfies a legal obligation is not something this project can tell you.
+
+        You may write in Turkish. Türkçe yazabilirsiniz.
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: What you have already read or tried
+      description: The README, the docs directory, and any command you ran.

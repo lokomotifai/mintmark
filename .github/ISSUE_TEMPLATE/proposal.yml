@@ -1,0 +1,40 @@
+name: Proposal
+description: Propose a change to what this repository declares or does.
+title: "[Proposal]: "
+labels: ["proposal"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        State the observable outcome you want and why the current behavior does not give it.
+
+        You may write in Turkish. Türkçe yazabilirsiniz.
+  - type: textarea
+    id: outcome
+    attributes:
+      label: The outcome you want
+      description: What would be observably different, and for whom.
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: What happens today
+      description: The current behavior, with a command if one shows it.
+    validations:
+      required: true
+  - type: dropdown
+    id: bytes
+    attributes:
+      label: Would this change emitted bytes for a fixed seed?
+      description: A change that does is a major version event, because it breaks the reproducibility of every published manifest.
+      options:
+        - "Yes"
+        - "No"
+        - "I am not sure"
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you considered instead

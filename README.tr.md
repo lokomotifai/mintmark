@@ -118,6 +118,8 @@ identifier policy: safe (confirmed)
 checksum-valid identifiers found: 0
 taxonomy: hushmark-tr v0.1, pin af11b31e4916
 label alignment: 100 documents, 81 spans
+dataset license: CC-BY-4.0
+attribution: mintmark-example 0.1.0 reference dataset (recipe demo, seed 42), lokomotifai, licensed CC-BY-4.0
 ```
 
 Bir test bu bloğu `verify`'ın gerçekten yazdığıyla karşılaştırır; böylece bu
@@ -332,6 +334,14 @@ tanımıdır.
 ## Lisans ve marka
 
 Kod Apache-2.0'dır. Bakınız [LICENSE](LICENSE) ve [NOTICE](NOTICE).
+
+Bu motorun ürettiği veri kümeleri, paketin bildirdiği koşulları taşır; koşullar
+`MINTMARK.json` içine yazılır ve `verify` tarafından yazdırılır. Ailedeki her
+paket **CC BY 4.0** bildirir: atıf koşuluyla, ticari dahil her kullanım. Bakınız
+[LICENSE-DATASETS.md](LICENSE-DATASETS.md).
+
+Sentetik bir veri kümesinin Türk veri koruma hukuku karşısında ne anlama
+gelip gelmediği [docs/kvkk.tr.md](docs/kvkk.tr.md) dosyasında açıklanmıştır.
 
 Lisans, Mintmark adı veya logosu üzerinde hiçbir hak vermez. Adil topluluk
 kullanımının neyi kapsadığı için bakınız [TRADEMARKS.md](TRADEMARKS.md).

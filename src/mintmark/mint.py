@@ -123,6 +123,21 @@ class MintError(RuntimeError):
     """A mint cannot proceed. Distinct from a malformed pack, which exits 2."""
 
 
+def attribution_line(pack: Pack, recipe: str, seed: int) -> str:
+    """The credit line a consumer reproduces to satisfy the dataset license.
+
+    Written into every manifest whatever the license says, because somebody who
+    wants to credit the source should not have to assemble the string from four
+    other fields and guess at the format. It names the dataset uniquely: two runs
+    that differ in recipe or seed are different datasets and get different lines.
+    """
+    return (
+        f"{pack.name} {pack.version} reference dataset "
+        f"(recipe {recipe}, seed {seed}), lokomotifai, "
+        f"licensed {pack.dataset_license}"
+    )
+
+
 def mint(
     *,
     pack: str | Path,
@@ -615,6 +630,8 @@ def _write(
             ),
             seed=seed,
             identifier_policy=policy.value,
+            dataset_license=loaded.dataset_license,
+            attribution=attribution_line(loaded, declared.name, seed),
             taxonomy=pin(),
             outputs=outputs,
             distributions=tuple(

@@ -1,5 +1,7 @@
 # Governance
 
+<sub><a href="GOVERNANCE.tr.md">Türkçe</a></sub>
+
 This file describes how decisions are made in this repository today, not how we
 would like them to be made eventually.
 

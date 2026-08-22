@@ -1,0 +1,33 @@
+name: A name that should not be here
+description: Report a real institution, brand, or person appearing in generated output.
+title: "[Name]: "
+labels: ["denylist"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Everything this project emits is meant to be fictional. A real name reaching a lexicon, a template, or generated output is a defect this project takes seriously, and one has happened before: a real insurer sat in a fictional lexicon during development because its name reads as an ordinary Turkish word.
+
+        If instead you believe the output relates to a real **person**, do not open a public issue. Use private vulnerability reporting.
+  - type: input
+    id: name
+    attributes:
+      label: The name
+      description: Exactly as it appears in the output.
+    validations:
+      required: true
+  - type: input
+    id: real
+    attributes:
+      label: What real entity it collides with
+      description: The full registered name, and a public source if you have one.
+    validations:
+      required: true
+  - type: textarea
+    id: where
+    attributes:
+      label: Where it appears
+      description: The file and line if it is in a declaration, or the command and seed if it is in generated output.
+      render: shell
+    validations:
+      required: true
