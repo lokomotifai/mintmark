@@ -15,7 +15,7 @@
   <a href="https://github.com/lokomotifai/mintmark/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/lokomotifai/mintmark/ci.yml?branch=main&amp;style=flat-square&amp;label=CI"></a>
   <img alt="926 tests" src="https://img.shields.io/badge/tests-926-3C873A?style=flat-square">
   <img alt="18 invariants, each with a named test" src="https://img.shields.io/badge/invariants-18%20tested-3C873A?style=flat-square">
-  <a href="https://github.com/lokomotifai/mintmark/releases/tag/v0.3.1"><img alt="Release v0.3.1" src="https://img.shields.io/badge/release-v0.3.1-3C873A?style=flat-square"></a>
+  <a href="https://github.com/lokomotifai/mintmark/releases/tag/v0.3.2"><img alt="Release v0.3.2" src="https://img.shields.io/badge/release-v0.3.2-3C873A?style=flat-square"></a>
   <a href="https://pypi.org/project/mintmark/"><img alt="On PyPI" src="https://img.shields.io/pypi/v/mintmark?style=flat-square&amp;label=PyPI&amp;color=3C873A"></a>
   <a href="LICENSE"><img alt="Apache-2.0 license" src="https://img.shields.io/badge/license-Apache--2.0-3B3F46?style=flat-square"></a>
 </p>
