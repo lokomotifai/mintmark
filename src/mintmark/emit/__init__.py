@@ -10,12 +10,13 @@ from mintmark.emit.canonical import (
     FloatInOutputError,
     render_record,
 )
-from mintmark.emit.csv_writer import csv_header, render_csv_row
+from mintmark.emit.csv_writer import SpreadsheetFormulaError, csv_header, render_csv_row
 from mintmark.emit.writer import StagedOutput, staged_output
 
 __all__ = [
     "CanonicalEncoder",
     "FloatInOutputError",
+    "SpreadsheetFormulaError",
     "StagedOutput",
     "csv_header",
     "render_csv_row",

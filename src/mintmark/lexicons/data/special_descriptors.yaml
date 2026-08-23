@@ -11,24 +11,18 @@ labels:
     values:
     - kronik rahatsızlık
     - geçici iş göremezlik
-    - rutin kontrol
-    - istirahat raporu
-    - kontrol randevusu
-    - ameliyat sonrası izin
-    - sağlık raporu
-    - tedavi süreci
-    - fizik tedavi programı
-    - doğum öncesi izin
-    - iş kazası sonrası rapor
-    - sevk belgesi
-    - kontrol izni
-    - rapor uzatma talebi
-    - iş göremezlik bildirimi
     - engel durumu beyanı
-    - refakat izni
-    - periyodik muayene kaydı
-    - sağlık kurulu belgesi
-    - gebelik izni bildirimi
+    - sağlık durumu beyanı
+    - mesleki sağlık kısıtı
+    - hareket kısıtlılığı beyanı
+    - görme desteği ihtiyacı
+    - işitme desteği ihtiyacı
+    - alerji durumu beyanı
+    - solunum hassasiyeti beyanı
+    - kas iskelet kısıtı beyanı
+    - süreli sağlık kısıtı
+    - kalıcı sağlık kısıtı
+    - bulaşıcı olmayan rahatsızlık sınıfı
   RELIGION:
     note: Observance and accommodation, not belief content.
     values:
@@ -45,20 +39,16 @@ labels:
     - inanç temelli mazeret bildirimi
     - ibadet alanı talebi
   ETHNICITY:
-    note: Declared origin and language preference, as an HR or claims form would record them.
+    note: Declared ethnic or cultural origin only, as a form would record it.
     values:
     - etnik köken beyanı
-    - anadil tercihi
-    - iki dilli iletişim talebi
-    - tercüman talebi
-    - yerel dil desteği
-    - köken beyanı formu
-    - azınlık dili desteği talebi
-    - yazışma dili tercihi
-    - kültürel uyum notu
-    - isim yazımı düzeltme talebi
-    - çeviri desteği kaydı
-    - ana dilde bilgilendirme talebi
+    - soy kökeni beyanı
+    - kültürel köken beyanı
+    - etnik kimlik beyanı
+    - azınlık grubu aidiyeti beyanı
+    - etnik topluluk aidiyeti
+    - aile kökeni bölgesi beyanı
+    - köken bilgisi formu
   POLITICAL:
     note: Fictional parties and civic bodies. No real party is ever named.
     values:
@@ -77,18 +67,14 @@ labels:
   SEXUAL_LIFE:
     note: Form-level references only. Never narrative, never detail.
     values:
-    - özel yaşam beyanı
-    - medeni hâl güncellemesi
-    - aile durumu bildirimi
-    - eş bilgisi güncellemesi
-    - birlikte yaşanan kişi beyanı
-    - hayat arkadaşı bildirimi
-    - nikah durumu kaydı
-    - aile birleşimi talebi
-    - eş sağlık kapsamı talebi
-    - boşanma durumu güncellemesi
-    - birliktelik beyanı formu
-    - aile içi durum bildirimi
+    - cinsel yaşam verisi beyanı
+    - cinsel yönelim beyanı
+    - mahrem ilişki bilgisi formu
+    - cinsel yaşam mahremiyet talebi
+    - cinsel yaşama ilişkin veri düzeltme talebi
+    - mahrem partner bilgisi beyanı
+    - cinsel yaşama ilişkin erişim kısıtı
+    - cinsel yaşam verisi silme talebi
   CRIMINAL:
     note: Check categories, never findings. 'A record was requested' is a process step; 'a record
       exists' would be an accusation about a person, and this project does not make those even

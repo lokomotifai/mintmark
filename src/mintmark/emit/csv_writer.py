@@ -13,7 +13,12 @@ from __future__ import annotations
 
 import csv
 import io
+import re
 from typing import Any
+
+
+class SpreadsheetFormulaError(ValueError):
+    """A string cell would be interpreted as active content by spreadsheets."""
 
 
 def csv_header(field_order: tuple[str, ...]) -> str:
@@ -40,8 +45,27 @@ def render_csv_row(record: dict[str, Any], field_order: tuple[str, ...]) -> str:
                 f"field {name!r} carries a {type(value).__name__}, which has no CSV "
                 "representation. Emit this record type as JSONL, or flatten the field."
             )
+        if isinstance(value, str) and _formula_prefix(value) is not None:
+            raise SpreadsheetFormulaError(
+                f"field {name!r} begins with spreadsheet formula trigger "
+                f"{_formula_prefix(value)!r}; CSV emission refuses active cells"
+            )
         cells.append("" if value is None else str(value))
     return _render_row(cells)
+
+
+def _formula_prefix(value: str) -> str | None:
+    position = 0
+    while position < len(value) and (value[position].isspace() or ord(value[position]) < 0x20):
+        position += 1
+    candidate = value[position:]
+    if re.fullmatch(r"[+-]\d+(?:\.\d+)?", candidate) or re.fullmatch(
+        r"\+90 5\d{2} \d{3} \d{2} \d{2}", candidate
+    ):
+        return None
+    if candidate.startswith(("=", "+", "-", "@")):
+        return candidate[0]
+    return None
 
 
 def _render_row(cells: list[str]) -> str:

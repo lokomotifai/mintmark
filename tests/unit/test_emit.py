@@ -14,6 +14,7 @@ import pytest
 
 from mintmark.emit import (
     FloatInOutputError,
+    SpreadsheetFormulaError,
     csv_header,
     render_csv_row,
     render_record,
@@ -130,6 +131,17 @@ def test_csv_refuses_a_nested_value_rather_than_inventing_a_convention() -> None
 def test_csv_refuses_a_float() -> None:
     with pytest.raises(TypeError, match="integer kurus"):
         render_csv_row({**RECORD, "balance_kurus": 1.5}, ORDER)
+
+
+def test_csv_refuses_spreadsheet_formula_cells_including_prefixed_forms() -> None:
+    for value in ("=1+1", "+SUM(A1:A2)", "-2+3", "@cmd", "\t =HYPERLINK(\"x\")"):
+        with pytest.raises(SpreadsheetFormulaError, match="active cells"):
+            render_csv_row({**RECORD, "first_name": value}, ORDER)
+    assert "+90 555 123 45 67" in render_csv_row(
+        {**RECORD, "first_name": "+90 555 123 45 67"}, ORDER
+    )
+    with pytest.raises(SpreadsheetFormulaError):
+        render_csv_row({**RECORD, "first_name": "+90 1+1"}, ORDER)
 
 
 def test_a_completed_mint_appears_at_its_target_path(tmp_path: Path) -> None:
