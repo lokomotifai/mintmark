@@ -533,6 +533,8 @@ def _mini_record_counts(loaded: Any, recipe: Any) -> dict[str, int]:
         for field in record_type.fields:
             if field.ref is None:
                 continue
+            if selected.get(record_type.type_name, 0) == 0:
+                continue
             parents = selected.get(field.ref.parent, 0)
             low = parents * min(field.ref.counts)
             high = parents * max(field.ref.counts)

@@ -619,6 +619,8 @@ def _cross_validate(
     for recipe_name, recipe in recipes.items():
         for record_type in record_types:
             child_count = recipe.records.get(record_type.type_name, 0)
+            if child_count == 0:
+                continue
             for declared in record_type.fields:
                 if declared.ref is None:
                     continue

@@ -129,6 +129,10 @@ def assign_children(
                 "a reference cannot dangle"
             )
         return []
+    if child_count == 0:
+        # A recipe may explicitly disable a record type. Cardinality applies
+        # when that relationship is present, not to a type the recipe omits.
+        return []
 
     minimum = min(counts)
     maximum = max(counts)
