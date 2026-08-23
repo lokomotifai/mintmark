@@ -171,8 +171,14 @@ def test_release_scans_and_seals_the_exact_built_artifacts_before_oidc() -> None
     assert "uv build --no-build-isolation" in build_text
     assert "uv export --locked --no-dev --no-emit-project" in build_text
     assert "tools/canary.py dist/" in build_text
-    assert "sha256sum mintmark-*.whl mintmark-*.tar.gz" in build_text
+    assert "sha256sum mintmark-*.whl mintmark-*.tar.gz sbom.json" in build_text
     assert "sha256sum -c SHA256SUMS" in publish_text
+    attestation = next(
+        step
+        for step in publish_steps
+        if step.get("uses", "").startswith("actions/attest-build-provenance@")
+    )
+    assert "dist/sbom.json" in attestation["with"]["subject-path"]
     publisher = next(
         step
         for step in publish_steps
