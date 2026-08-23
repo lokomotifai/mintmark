@@ -145,3 +145,45 @@ jobs:
           attestations: true
           packages-dir: dist/
           verify-metadata: true
+
+  github-release:
+    name: publish the verified GitHub release
+    needs: [verify, build, publish]
+    runs-on: ubuntu-latest
+    permissions:
+      attestations: write
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: distributions
+          path: dist/
+      - name: Verify the bytes approved by the build job
+        run: |
+          cd dist
+          sha256sum -c SHA256SUMS
+      - name: Attest the release distributions
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: |
+            dist/mintmark-*.whl
+            dist/mintmark-*.tar.gz
+      - name: Publish the release without rebuilding
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          gh release view "$RELEASE_TAG" >/dev/null 2>&1 && {
+            echo "::error::release $RELEASE_TAG already exists"
+            exit 1
+          }
+          gh release create "$RELEASE_TAG" \
+            dist/mintmark-*.whl \
+            dist/mintmark-*.tar.gz \
+            dist/sbom.json \
+            dist/SHA256SUMS \
+            --verify-tag \
+            --title "Mintmark $RELEASE_TAG" \
+            --generate-notes
