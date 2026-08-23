@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 from pathlib import Path
 
+import jsonschema
 import pytest
 import yaml
 
@@ -93,6 +95,26 @@ def test_recipe_record_count_is_bounded(tmp_path: Path) -> None:
 
     with pytest.raises(PackError):
         load_pack(pack)
+
+
+def test_manifest_schema_uses_the_pack_record_count_budget(tmp_path: Path) -> None:
+    out = tmp_path / "manifest-budget"
+    mint(pack=CONFORMANCE, recipe="full", seed=1, out=out, invocation="pytest")
+    document = json.loads((out / "MINTMARK.json").read_text(encoding="utf-8"))
+    schema = json.loads(
+        (Path(__file__).resolve().parents[2] / "schemas" / "manifest.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    document["recipe"]["parameters"]["records"]["transaction"] = MAX_RECORDS_PER_TYPE
+    document["stats"]["record_counts"]["transaction"] = MAX_RECORDS_PER_TYPE
+    jsonschema.validate(document, schema)
+
+    document["recipe"]["parameters"]["records"]["transaction"] = MAX_RECORDS_PER_TYPE + 1
+    document["stats"]["record_counts"]["transaction"] = MAX_RECORDS_PER_TYPE + 1
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(document, schema)
 
 
 def test_runtime_record_override_uses_the_same_budget(tmp_path: Path) -> None:
