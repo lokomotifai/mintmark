@@ -18,8 +18,11 @@ import pytest
 
 from mintmark.annotate import Label
 from mintmark.api import verify
+from mintmark.engine.prng import SplitMix64
+from mintmark.engine.streams import StreamFactory
+from mintmark.identifiers import IdentifierPolicy
 from mintmark.manifest import MANIFEST_FILENAME, read_manifest
-from mintmark.mint import MintError, mint
+from mintmark.mint import ENGINE_MAJOR, MintError, _MintContext, mint
 from mintmark.packs.loader import PackError
 from mintmark.packs.model import load_pack
 
@@ -146,6 +149,23 @@ def test_template_weights_decide_the_draw(tmp_path: Path):
     assert counts["transfer_to_person"] > counts["bill_payment"] * 1.8
 
 
+def test_template_weights_are_scaled_once_per_mint(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    import mintmark.mint as mint_module
+
+    calls = 0
+    original = mint_module.scale_weights
+
+    def counted(weights: list[str]) -> list[int]:
+        nonlocal calls
+        calls += 1
+        return original(weights)
+
+    monkeypatch.setattr(mint_module, "scale_weights", counted)
+    mint(pack=EXAMPLE, recipe="demo", seed=9, out=tmp_path / "run", records={"transaction": 400})
+
+    assert calls == len(load_pack(EXAMPLE).template_sets)
+
+
 # Coverage targets.
 
 
@@ -252,6 +272,60 @@ def test_entity_lexicons_naming_an_undeclared_lexicon_is_refused(pack_copy: Path
     )
     with pytest.raises(PackError, match="unknown-lexicon"):
         load_pack(pack_copy)
+
+
+def test_entity_lexicon_names_must_be_unique(pack_copy: Path):
+    _edit(
+        pack_copy / "pack.yaml",
+        "dataset_license:",
+        "entity_lexicons:\n  ORG: [employers_fictional, employers_fictional]\ndataset_license:",
+    )
+    with pytest.raises(PackError, match="non-unique elements"):
+        load_pack(pack_copy)
+
+
+def test_entity_surfaces_are_composed_once_per_mint(
+    pack_copy: Path, monkeypatch: pytest.MonkeyPatch
+):
+    (pack_copy / "lexicons").mkdir(exist_ok=True)
+    (pack_copy / "lexicons" / "employers_fictional.yaml").write_text(
+        "name: employers_fictional\nsource_note: invented for this test\nvalues:\n"
+        "- Zeytinli Ambalaj\n- Karadut Yazilim\n",
+        "utf-8",
+    )
+    _edit(
+        pack_copy / "pack.yaml",
+        "dataset_license:",
+        "entity_lexicons:\n  ORG: [employers_fictional]\ndataset_license:",
+    )
+    loaded = load_pack(pack_copy)
+    recipe = loaded.recipe("demo")
+    context = _MintContext(
+        pack=loaded,
+        recipe=recipe,
+        factory=StreamFactory(
+            seed=1,
+            engine_major=ENGINE_MAJOR,
+            pack_name=loaded.name,
+            pack_version=loaded.version,
+            recipe_name=recipe.name,
+        ),
+        policy=IdentifierPolicy.SAFE,
+        counts=dict(recipe.records),
+    )
+    calls = 0
+    original = _MintContext.lexicon_values
+
+    def counted(self: _MintContext, name: str):  # type: ignore[no-untyped-def]
+        nonlocal calls
+        calls += 1
+        return original(self, name)
+
+    monkeypatch.setattr(_MintContext, "lexicon_values", counted)
+    for seed in range(100):
+        context._descriptor(Label.ORG, SplitMix64(seed))
+
+    assert calls == 1
 
 
 def _org_surfaces(directory: Path) -> set[str]:

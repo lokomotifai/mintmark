@@ -16,6 +16,7 @@ tolerate.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 
@@ -126,8 +127,27 @@ def weighted_index(stream: SplitMix64, weights: list[str]) -> int:
     weights first would change which index a given draw selects and therefore
     change emitted bytes for a fixed seed.
     """
-    scaled = scale_weights(weights)
+    return weighted_index_scaled(stream, scale_weights(weights))
+
+
+def weighted_index_scaled(stream: SplitMix64, scaled: Sequence[int]) -> int:
+    """Draw from weights that were validated and scaled at declaration load time.
+
+    Generation hot paths call this form so a pack with thousands of choices
+    cannot multiply decimal parsing by its record count. The caller must retain
+    declaration order; doing so preserves the exact draw made by
+    :func:`weighted_index`.
+    """
+    if not scaled:
+        raise ValueError("scaled weights must not be empty")
+    if any(
+        not isinstance(weight, int) or isinstance(weight, bool) or weight < 0
+        for weight in scaled
+    ):
+        raise ValueError("scaled weights must be non-negative integers")
     total = sum(scaled)
+    if total <= 0:
+        raise ValueError("scaled weights sum to zero")
     target = bounded(stream, total)
     cumulative = 0
     for index, weight in enumerate(scaled):

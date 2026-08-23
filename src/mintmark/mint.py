@@ -45,7 +45,9 @@ from mintmark.engine.draws import (
     bounded,
     bounded_range,
     datetime_in_window,
+    scale_weights,
     weighted_index,
+    weighted_index_scaled,
 )
 from mintmark.engine.prng import SplitMix64
 from mintmark.engine.records import (
@@ -300,9 +302,10 @@ class _MintContext:
     tallies: dict[str, DistributionTally] = dataclass_field(default_factory=dict)
     coverage: dict[str, int] = dataclass_field(default_factory=dict)
     _tables: dict[str, Table] = dataclass_field(default_factory=dict)
-    _templates: dict[str, tuple[tuple[tuple[Node, ...], ...], tuple[str, ...]]] = dataclass_field(
+    _templates: dict[str, tuple[tuple[tuple[Node, ...], ...], tuple[int, ...]]] = dataclass_field(
         default_factory=dict
     )
+    _descriptors: dict[Label, tuple[str, ...]] = dataclass_field(default_factory=dict)
 
     def compile_templates(self) -> None:
         """Compile every declared template before any records are generated."""
@@ -325,8 +328,8 @@ class _MintContext:
             self._tables[name] = load_table(asset_dir("tables"), name)
         return self._tables[name]
 
-    def templates(self, set_name: str) -> tuple[tuple[tuple[Node, ...], ...], tuple[str, ...]]:
-        """Parsed templates and their declared weights, in declaration order."""
+    def templates(self, set_name: str) -> tuple[tuple[tuple[Node, ...], ...], tuple[int, ...]]:
+        """Parsed templates and pre-scaled weights, in declaration order."""
         if set_name not in self._templates:
             entries = self.pack.template_sets[set_name]
             known_lexicons = frozenset(self.pack.lexicons) | core_lexicon_names()
@@ -341,7 +344,7 @@ class _MintContext:
                     )
                     for entry in entries
                 ),
-                tuple(entry.weight for entry in entries),
+                tuple(scale_weights([entry.weight for entry in entries])),
             )
         return self._templates[set_name]
 
@@ -569,7 +572,7 @@ class _MintContext:
         stream = self.factory.stream(f"{record_type.type_name}/{index}/{doc_field.name}/pick")
         # Declared weights, not a uniform pick. A weight the engine ignores makes
         # every template set an even mix whatever the pack wrote down.
-        nodes = parsed[weighted_index(stream, list(weights))]
+        nodes = parsed[weighted_index_scaled(stream, weights)]
 
         render_stream = self.factory.stream(
             f"{record_type.type_name}/{index}/{doc_field.name}/render"
@@ -602,13 +605,13 @@ class _MintContext:
         them. A pack may now contribute its own, appended after the core's so that
         the core list stays the floor rather than something a pack can replace.
         """
-        values = core_descriptors(label)
-        extra = self.pack.entity_lexicons.get(label.value, ())
-        if extra:
-            surfaces = list(values)
-            for name in extra:
+        values = self._descriptors.get(label)
+        if values is None:
+            surfaces = list(core_descriptors(label))
+            for name in self.pack.entity_lexicons.get(label.value, ()):
                 surfaces.extend(self.lexicon_values(name))
-            values = surfaces
+            values = tuple(surfaces)
+            self._descriptors[label] = values
         return values[bounded(stream, len(values))]
 
     def _lexicon_surface(self, name: str, stream: SplitMix64) -> str:

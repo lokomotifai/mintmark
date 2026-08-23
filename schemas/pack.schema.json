@@ -76,6 +76,8 @@
       "additionalProperties": {
         "type": "array",
         "minItems": 1,
+        "maxItems": 128,
+        "uniqueItems": true,
         "items": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*$"
