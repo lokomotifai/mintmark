@@ -11,6 +11,24 @@ output for a fixed set of inputs. A change that alters emitted bytes for a fixed
 seed is a major version event even when no signature changed, because it breaks
 the reproducibility of every published manifest.
 
+## 0.3.0 - 2026-08-23
+
+### Security
+
+- HEALTH descriptors are condition classes only; treatment, surgery, therapy,
+  appointment, and examination phrases are no longer emitted under that label.
+- ETHNICITY no longer labels language/accommodation requests, and SEXUAL_LIFE no
+  longer labels marital or family-status phrases. Independent tests define the
+  forbidden semantic boundaries rather than trusting the descriptor file as its
+  own oracle.
+- CSV emission rejects string cells whose first meaningful character is a
+  spreadsheet formula trigger (`=`, `+`, `-`, or `@`), including whitespace- and
+  control-prefixed forms. It fails closed instead of changing the source value or
+  emitting active spreadsheet content.
+
+The descriptor corrections move document bytes for fixed seeds and therefore
+constitute a version event under this project's reproducibility contract.
+
 ## 0.2.1 - 2026-08-23
 
 ### Security
