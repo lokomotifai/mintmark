@@ -44,7 +44,7 @@ def _edit(path: Path, old: str, new: str) -> None:
     path.write_text(text.replace(old, new, 1), encoding="utf-8")
 
 
-# The recipe decides the identifier policy.
+# The recipe is binding, and the caller must still opt in to validator mode.
 
 
 def test_a_recipe_that_names_a_policy_refuses_a_different_one(pack_copy: Path, tmp_path: Path):
@@ -56,7 +56,7 @@ def test_a_recipe_that_names_a_policy_refuses_a_different_one(pack_copy: Path, t
         "special_rate:",
         "identifier_policy: safe\nspecial_rate:",
     )
-    with pytest.raises(MintError, match="The recipe decides"):
+    with pytest.raises(MintError, match="recipe is binding"):
         mint(
             pack=pack_copy,
             recipe="demo",
@@ -66,13 +66,23 @@ def test_a_recipe_that_names_a_policy_refuses_a_different_one(pack_copy: Path, t
         )
 
 
-def test_a_recipe_that_names_a_policy_supplies_it_without_a_flag(pack_copy: Path, tmp_path: Path):
+def test_a_validator_recipe_cannot_replace_the_safe_caller_default(
+    pack_copy: Path, tmp_path: Path
+):
     _edit(
         pack_copy / "recipes" / "demo.yaml",
         "special_rate:",
         "identifier_policy: validator\nspecial_rate:",
     )
-    summary = mint(pack=pack_copy, recipe="demo", seed=1, out=tmp_path / "out")
+    with pytest.raises(MintError, match="explicit caller opt-in"):
+        mint(pack=pack_copy, recipe="demo", seed=1, out=tmp_path / "out")
+    summary = mint(
+        pack=pack_copy,
+        recipe="demo",
+        seed=1,
+        out=tmp_path / "explicit",
+        identifier_policy="validator",
+    )
     assert summary.identifier_policy == "validator"
 
 

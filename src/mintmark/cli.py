@@ -98,8 +98,8 @@ def build_parser() -> argparse.ArgumentParser:
     mint_parser.add_argument(
         "--identifier-policy",
         choices=["safe", "validator"],
-        default=None,
-        help="only needed when the recipe does not name one; a recipe that does, decides",
+        default="safe",
+        help="safe by default; validator requires an explicit caller opt-in",
     )
     mint_parser.add_argument("--format", choices=["jsonl", "csv"], default="jsonl")
     mint_parser.add_argument("--json", action="store_true")

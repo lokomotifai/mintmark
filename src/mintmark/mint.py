@@ -183,21 +183,19 @@ def _resolve_policy(requested: str | None, recipe: Recipe, pack: Pack) -> Identi
     moment a caller passed the flag. A declaration that a reader takes for a
     control has to be one.
 
-    The caller may still name the same policy, because `reproduce` replays what a
-    manifest recorded and a script should not have to know which of the two
-    decided it. Naming a different one is refused rather than silently ranked.
+    The caller must still name validator mode affirmatively. A recipe may require
+    validator mode, but it cannot turn an omitted caller choice into the weaker
+    policy. `reproduce` passes the manifest's recorded policy explicitly. Naming
+    a different policy from the recipe is refused rather than silently ranked.
     """
-    if (
-        requested is not None
-        and recipe.identifier_policy is not None
-        and requested != recipe.identifier_policy
-    ):
+    effective = requested or "safe"
+    if recipe.identifier_policy is not None and effective != recipe.identifier_policy:
         raise MintError(
             f"recipe {recipe.name!r} is minted under the "
             f"{recipe.identifier_policy!r} identifier policy and asked for "
-            f"{requested!r}. The recipe decides; drop the flag, or change the recipe."
+            f"{effective!r}. The recipe is binding, but validator mode also requires "
+            "an explicit caller opt-in. Pass the matching policy, or change the recipe."
         )
-    effective = requested if requested is not None else (recipe.identifier_policy or "safe")
     policy = parse_policy(effective)
     if policy.value not in pack.allowed_identifier_policies:
         allowed = ", ".join(pack.allowed_identifier_policies)

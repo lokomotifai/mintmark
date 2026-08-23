@@ -289,7 +289,7 @@
             "safe",
             "validator"
           ],
-          "description": "The policy this recipe is minted under. Binding: a mint that asks for a different one is refused. Absent means the caller chooses, defaulting to safe."
+          "description": "The policy this recipe is minted under. Binding: a mint that asks for a different one is refused. Validator mode still requires an explicit caller opt-in; an omitted caller choice is always safe."
         }
       }
     },
