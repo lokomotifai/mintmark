@@ -5,8 +5,7 @@ from pathlib import Path
 import yaml
 
 DESCRIPTORS = (
-    Path(__file__).resolve().parents[2]
-    / "src/mintmark/lexicons/data/special_descriptors.yaml"
+    Path(__file__).resolve().parents[2] / "src/mintmark/lexicons/data/special_descriptors.yaml"
 )
 
 

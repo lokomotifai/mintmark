@@ -134,7 +134,7 @@ def test_csv_refuses_a_float() -> None:
 
 
 def test_csv_refuses_spreadsheet_formula_cells_including_prefixed_forms() -> None:
-    for value in ("=1+1", "+SUM(A1:A2)", "-2+3", "@cmd", "\t =HYPERLINK(\"x\")"):
+    for value in ("=1+1", "+SUM(A1:A2)", "-2+3", "@cmd", '\t =HYPERLINK("x")'):
         with pytest.raises(SpreadsheetFormulaError, match="active cells"):
             render_csv_row({**RECORD, "first_name": value}, ORDER)
     assert "+90 555 123 45 67" in render_csv_row(

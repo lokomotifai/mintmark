@@ -36,8 +36,7 @@ def _security_fold(text: str) -> str:
     visible = "".join(
         character
         for character in normalized
-        if not unicodedata.combining(character)
-        and unicodedata.category(character) != "Cf"
+        if not unicodedata.combining(character) and unicodedata.category(character) != "Cf"
     )
     return fold(visible)
 

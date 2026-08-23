@@ -52,9 +52,7 @@ def test_infeasible_recipe_relationship_totals_are_refused(pack_copy: Path) -> N
 
 
 @pytest.mark.parametrize("unsafe", ["Akbank", "4111111111111111"])
-def test_packcheck_exhaustively_rejects_unsafe_enum_literals(
-    pack_copy: Path, unsafe: str
-) -> None:
+def test_packcheck_exhaustively_rejects_unsafe_enum_literals(pack_copy: Path, unsafe: str) -> None:
     _edit(
         pack_copy / "fields" / "transaction.yaml",
         "values: [mobil, internet, pos, atm, sube]",
@@ -85,9 +83,7 @@ def test_a_recipe_that_names_a_policy_refuses_a_different_one(pack_copy: Path, t
         )
 
 
-def test_a_validator_recipe_cannot_replace_the_safe_caller_default(
-    pack_copy: Path, tmp_path: Path
-):
+def test_a_validator_recipe_cannot_replace_the_safe_caller_default(pack_copy: Path, tmp_path: Path):
     _edit(
         pack_copy / "recipes" / "demo.yaml",
         "special_rate:",

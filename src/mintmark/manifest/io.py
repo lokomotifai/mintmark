@@ -149,9 +149,7 @@ class DatasetReader:
         except UnicodeDecodeError as exc:
             raise DatasetIOError(f"{name}: is not valid UTF-8") from exc
 
-    def iter_text_lines(
-        self, name: str, *, max_bytes: int, max_line_chars: int
-    ) -> Iterator[str]:
+    def iter_text_lines(self, name: str, *, max_bytes: int, max_line_chars: int) -> Iterator[str]:
         """Yield UTF-8 physical lines without materializing an untrusted file.
 
         The complete byte stream is still hashed and pinned to the same file
@@ -176,9 +174,7 @@ class DatasetReader:
                     break
                 size += len(chunk)
                 if size > max_bytes:
-                    raise DatasetIOError(
-                        f"{name}: exceeds the {max_bytes}-byte verification limit"
-                    )
+                    raise DatasetIOError(f"{name}: exceeds the {max_bytes}-byte verification limit")
                 digest.update(chunk)
                 try:
                     buffer += decoder.decode(chunk)
@@ -187,9 +183,7 @@ class DatasetReader:
 
                 while True:
                     positions = [
-                        position
-                        for mark in ("\n", "\r")
-                        if (position := buffer.find(mark)) >= 0
+                        position for mark in ("\n", "\r") if (position := buffer.find(mark)) >= 0
                     ]
                     if not positions:
                         break
