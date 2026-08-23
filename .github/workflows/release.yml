@@ -121,36 +121,6 @@ jobs:
       name: pypi
       url: https://pypi.org/project/mintmark/${{ needs.verify.outputs.version }}/
     permissions:
-      id-token: write
-    steps:
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: distributions
-          path: dist/
-      - name: Verify the bytes approved by the build job
-        run: |
-          cd dist
-          sha256sum -c SHA256SUMS
-      - name: Remove everything that is not a distribution
-        # The step name is the contract: PyPI accepts a wheel and an sdist and
-        # refuses anything else in the directory it is pointed at. Removing the
-        # bill of materials by name left SHA256SUMS behind, and the upload failed
-        # on it after the checksums had already been verified.
-        run: |
-          set -euo pipefail
-          find dist -type f ! -name 'mintmark-*.whl' ! -name 'mintmark-*.tar.gz' -delete
-          ls -1 dist/
-      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
-        with:
-          attestations: true
-          packages-dir: dist/
-          verify-metadata: true
-
-  github-release:
-    name: publish the verified GitHub release
-    needs: [verify, build, publish]
-    runs-on: ubuntu-latest
-    permissions:
       attestations: write
       contents: write
       id-token: write
@@ -163,6 +133,17 @@ jobs:
         run: |
           cd dist
           sha256sum -c SHA256SUMS
+      - name: Stage only distributions for PyPI
+        run: |
+          set -euo pipefail
+          mkdir pypi-dist
+          cp dist/mintmark-*.whl dist/mintmark-*.tar.gz pypi-dist/
+          ls -1 pypi-dist/
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
+        with:
+          attestations: true
+          packages-dir: pypi-dist/
+          verify-metadata: true
       - name: Attest the release distributions
         uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
         with:

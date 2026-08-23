@@ -173,7 +173,11 @@ def test_release_scans_and_seals_the_exact_built_artifacts_before_oidc() -> None
     assert "tools/canary.py dist/" in build_text
     assert "sha256sum mintmark-*.whl mintmark-*.tar.gz" in build_text
     assert "sha256sum -c SHA256SUMS" in publish_text
-    publisher = publish_steps[-1]
+    publisher = next(
+        step
+        for step in publish_steps
+        if step.get("uses", "").startswith("pypa/gh-action-pypi-publish@")
+    )
     assert publisher["uses"].startswith("pypa/gh-action-pypi-publish@")
     assert publisher["with"]["verify-metadata"] is True
     canary = next(step for step in build_steps if "MINTMARK_CANARY" in step.get("env", {}))
