@@ -11,6 +11,18 @@ output for a fixed set of inputs. A change that alters emitted bytes for a fixed
 seed is a major version event even when no signature changed, because it breaks
 the reproducibility of every published manifest.
 
+## 0.3.2 - 2026-08-23
+
+### Security
+
+- Release checksums and GitHub build-provenance attestations now cover the
+  CycloneDX SBOM alongside the wheel and source distribution.
+- Artifact upload and download steps use immutable, Node 24-compatible action
+  revisions.
+
+Generated record and label files do not change for the same inputs. Manifests
+record the patch engine version.
+
 ## 0.3.1 - 2026-08-23
 
 ### Fixed
