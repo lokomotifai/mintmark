@@ -1,8 +1,8 @@
 # Citation metadata, in Citation File Format 1.2.0.
 # GitHub renders this as "Cite this repository".
 #
-# No release has been published and there is no DOI. `version` names the
-# current unreleased version so a citation is unambiguous about what it saw.
+# The published release has no DOI. `version` and `date-released` make a
+# citation unambiguous about what it saw.
 #
 # `license` is the code license. Datasets minted from this repository carry
 # CC-BY-4.0, which is recorded in LICENSE-DATASETS.md and written into every
@@ -17,7 +17,8 @@ abstract: A generation engine for fully synthetic, Turkish-first labeled dataset
   a manifest that lets anyone re-derive the identical bytes. Code is Apache-2.0; datasets
   minted from any pack in this family carry CC-BY-4.0.
 type: software
-version: 0.3.0
+version: 0.3.1
+date-released: 2026-08-23
 authors:
 - family-names: Guner
   given-names: Fatih
