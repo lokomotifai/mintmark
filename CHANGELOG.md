@@ -359,3 +359,6 @@ and the name was still provisional. Both changed later the same day, in 0.1.1 an
 in the trademark clearance recorded in TRADEMARKS.md. This note is left as it was
 written rather than edited, because a changelog that quietly updates itself stops
 being a record.
+- Denylist comparisons now use compatibility normalization and remove combining
+  and default-ignorable characters, closing NFD, full-width, and zero-width
+  obfuscation bypasses without changing emitted span offsets.

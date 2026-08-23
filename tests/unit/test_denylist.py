@@ -104,6 +104,18 @@ def test_matching_folds_turkish_characters() -> None:
 
 
 @pytest.mark.parametrize(
+    "variant",
+    [
+        "Tu\u0308rkiye I\u0307s\u0327 Bankası",
+        "Türkiye I\u200bş Bankası",
+        "Ｔüｒｋｉｙｅ İş Bankası",
+    ],
+)
+def test_security_matching_rejects_unicode_obfuscation(variant: str) -> None:
+    assert CORE.scan(variant), f"Unicode variant bypassed the denylist: {variant!r}"
+
+
+@pytest.mark.parametrize(
     "institution",
     [
         "Türkiye İş Bankası A.Ş.",

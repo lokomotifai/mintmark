@@ -17,10 +17,29 @@ unambiguous; this module carries the matching discipline that makes them usable.
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 
 from mintmark.engine.fold import fold
+
+
+def _security_fold(text: str) -> str:
+    """Canonicalize adversarial text for comparison, not for emitted spans.
+
+    Display folding deliberately preserves code-point length. Denylist matching
+    has a different invariant: canonically equivalent, compatibility, and
+    default-ignorable variants must compare identically even when that changes
+    length.
+    """
+    normalized = unicodedata.normalize("NFKD", text)
+    visible = "".join(
+        character
+        for character in normalized
+        if not unicodedata.combining(character)
+        and unicodedata.category(character) != "Cf"
+    )
+    return fold(visible)
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,7 +68,7 @@ class Denylist:
 
     def scan(self, text: str) -> list[DenylistHit]:
         """Return every entry that appears in `text` as a whole phrase."""
-        folded = fold(text)
+        folded = _security_fold(text)
         hits: list[DenylistHit] = []
         for entry, source in self.entries.items():
             # \b on both ends so "ing" matches the bank but not "brifing".
@@ -88,7 +107,7 @@ def parse(text: str) -> Denylist:
                 f"denylist entry {phrase!r} is shorter than three characters. Short "
                 "entries match too much; qualify it with more of the institution name."
             )
-        entries[fold(phrase)] = comment.strip() or phrase
+        entries[_security_fold(phrase)] = comment.strip() or phrase
     if not entries:
         raise ValueError("denylist is empty; an empty denylist silently permits everything")
     return Denylist(entries=entries)
