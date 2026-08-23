@@ -17,10 +17,9 @@ the whole picture.
 from __future__ import annotations
 
 import csv
-import io
 import re
 from collections import Counter
-from collections.abc import Callable
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 from datetime import datetime
@@ -53,6 +52,20 @@ MAX_SCHEMA_PROBLEMS = 100
 MAX_RECORDS_PER_OUTPUT = 1_000_000  # matches MAX_RECORDS_PER_TYPE in packs.model
 MAX_RECORD_CHARS = 1 << 20
 MAX_SPANS_PER_DOCUMENT = 4096
+MAX_VERIFY_DATASET_BYTES = 512 << 20
+MAX_VERIFY_PROBLEMS = 1_000
+
+
+class _ProblemList(list[str]):
+    """Bound diagnostics so hostile repetition cannot become a second DoS."""
+
+    def append(self, problem: str) -> None:
+        if len(self) < MAX_VERIFY_PROBLEMS:
+            super().append(problem)
+        elif len(self) == MAX_VERIFY_PROBLEMS:
+            super().append(
+                f"verification found more than {MAX_VERIFY_PROBLEMS} problems; remaining omitted"
+            )
 
 
 @dataclass(slots=True)
@@ -74,7 +87,7 @@ class VerifyReport:
     attribution: str = ""
     manifest_sha256: str = ""
     authenticity: str = "self-consistency only; no trusted manifest digest supplied"
-    problems: list[str] = dataclass_field(default_factory=list)
+    problems: list[str] = dataclass_field(default_factory=_ProblemList)
 
     @property
     def ok(self) -> bool:
@@ -216,23 +229,16 @@ def verify(
             _check_validator_warning(document, report)
             _check_checksums(reader, document, report)
             _check_sums_file(reader, document, report)
-            records = _load_primary_records(reader, document, report)
+            primary = _scan_primary_records(reader, document, report, validators)
             label_counts = _check_spans(
                 reader,
                 document,
                 report,
-                records=records,
+                document_texts=primary.document_texts,
                 known_labels=known_labels,
             )
-            _check_manifest_claims(document, records, label_counts, report, known_labels)
+            _check_manifest_claims(document, primary, label_counts, report, known_labels)
             _check_coverage(document, report)
-            # The sweep runs under both policies. It used to run only under `safe`
-            # while the counter it fills was reported either way, so a validator
-            # dataset in which every identifier passes its checksum was reported
-            # as carrying none of them, in the rendered report and in the --json
-            # payload alike. A script gating on that number let through exactly
-            # the datasets it was written to stop.
-            _sweep_identifiers(records, validators, report)
         except Exception as exc:  # verifier boundary: hostile input must become a report
             report.problems.append(f"verification aborted safely: {type(exc).__name__}: {exc}")
 
@@ -248,6 +254,12 @@ def _check_manifest_semantics(document: dict[str, Any], report: VerifyReport) ->
     for reserved in (MANIFEST_FILENAME, SUMS_FILENAME):
         if reserved in paths:
             report.problems.append(f"{MANIFEST_FILENAME}: outputs may not claim {reserved}")
+    total_bytes = sum(output["bytes"] for output in document["outputs"])
+    if total_bytes > MAX_VERIFY_DATASET_BYTES:
+        report.problems.append(
+            f"{MANIFEST_FILENAME}: outputs claim {total_bytes} bytes; aggregate verification "
+            f"limit is {MAX_VERIFY_DATASET_BYTES}"
+        )
     try:
         seed = int(document["seed"])
     except ValueError:
@@ -377,12 +389,22 @@ def _check_sums_file(reader: DatasetReader, document: dict[str, Any], report: Ve
         report.problems.append(f"{SUMS_FILENAME} omits {missing!r}")
 
 
-def _load_primary_records(
-    reader: DatasetReader, document: dict[str, Any], report: VerifyReport
-) -> dict[str, tuple[dict[str, object], ...]]:
-    """Parse each primary output once under record and field-size budgets."""
-    loaded: dict[str, tuple[dict[str, object], ...]] = {}
+@dataclass(slots=True)
+class _PrimaryScan:
+    record_counts: dict[str, int]
+    distribution_counts: dict[str, Counter[str]]
+    document_texts: dict[str, dict[str, str]]
+
+
+def _scan_primary_records(
+    reader: DatasetReader,
+    document: dict[str, Any],
+    report: VerifyReport,
+    validators: dict[str, Validator],
+) -> _PrimaryScan:
+    """Stream primary outputs into bounded semantic aggregates."""
     type_outputs: dict[str, str] = {}
+    primary_outputs: list[tuple[dict[str, Any], str, str, str]] = []
     for output in document["outputs"]:
         name = output["path"]
         if name.endswith(".labels.jsonl"):
@@ -403,79 +425,169 @@ def _load_primary_records(
             )
             continue
         type_outputs[type_name] = name
+        primary_outputs.append((output, name, type_name, fmt))
+
+    sites_by_type: dict[str, list[tuple[str, str, dict[str, str]]]] = {}
+    distribution_counts: dict[str, Counter[str]] = {}
+    seen_sites: set[str] = set()
+    for distribution in document["stats"]["distributions"]:
+        site = distribution["site"]
+        if site in seen_sites:
+            report.problems.append(f"stats.distributions duplicates site {site!r}")
+            continue
+        seen_sites.add(site)
+        type_name, separator, field_name = site.partition("/")
+        if not separator or "/" in field_name or type_name not in type_outputs:
+            report.problems.append(f"stats.distributions site {site!r} does not resolve")
+            continue
+        target = distribution["target"]
+        sites_by_type.setdefault(type_name, []).append((site, field_name, target))
+        distribution_counts[site] = Counter()
+
+    names = {output["path"] for output in document["outputs"]}
+    record_counts: dict[str, int] = {}
+    document_texts: dict[str, dict[str, str]] = {}
+    for output, name, type_name, fmt in primary_outputs:
+        count = 0
+        texts: dict[str, str] | None = (
+            {} if f"{type_name}.labels.jsonl" in names else None
+        )
 
         try:
-            text = reader.read_text(name, max_bytes=MAX_DATA_FILE_BYTES)
-        except (DatasetIOError, OSError, ValueError) as exc:
-            report.problems.append(str(exc))
-            continue
-
-        rows: list[dict[str, object]] = []
-        if fmt == "jsonl":
-            for number, line in enumerate(text.splitlines(), start=1):
-                if not line.strip():
-                    continue
-                if len(line) > MAX_RECORD_CHARS:
-                    report.problems.append(f"{name} line {number}: exceeds the record size limit")
-                    continue
-                try:
-                    record = strict_json_loads(line, context=f"{name} line {number}")
-                except ValueError as exc:
-                    report.problems.append(str(exc))
-                    continue
-                if not isinstance(record, dict):
-                    report.problems.append(f"{name} line {number}: record is not a JSON object")
-                    continue
-                rows.append(record)
-                if len(rows) > MAX_RECORDS_PER_OUTPUT:
-                    report.problems.append(f"{name}: exceeds the record-count limit")
-                    break
-        else:
-            previous_limit = csv.field_size_limit()
-            try:
+            if fmt == "jsonl":
+                lines = reader.iter_text_lines(
+                    name,
+                    max_bytes=MAX_DATA_FILE_BYTES,
+                    max_line_chars=MAX_RECORD_CHARS,
+                )
+                for number, line in enumerate(lines, start=1):
+                    if not line.strip():
+                        continue
+                    try:
+                        parsed = strict_json_loads(line, context=f"{name} line {number}")
+                    except ValueError as exc:
+                        report.problems.append(str(exc))
+                        continue
+                    if not isinstance(parsed, dict):
+                        report.problems.append(f"{name} line {number}: record is not a JSON object")
+                        continue
+                    count += 1
+                    _observe_primary_record(
+                        name,
+                        number,
+                        parsed,
+                        type_name,
+                        sites_by_type,
+                        distribution_counts,
+                        texts,
+                        validators,
+                        report,
+                    )
+                    if count > MAX_RECORDS_PER_OUTPUT:
+                        report.problems.append(f"{name}: exceeds the record-count limit")
+                        break
+            else:
+                previous_limit = csv.field_size_limit()
                 csv.field_size_limit(MAX_RECORD_CHARS)
-                parsed = csv.reader(io.StringIO(text, newline=""))
                 try:
-                    header = next(parsed)
-                except StopIteration:
-                    header = []
-                if (
-                    not header
-                    or any(not field for field in header)
-                    or len(set(header)) != len(header)
-                ):
-                    report.problems.append(f"{name}: CSV header is missing or ambiguous")
-                elif len(header) > 256:
-                    report.problems.append(f"{name}: CSV header exceeds the field-count limit")
-                else:
-                    for number, values in enumerate(parsed, start=2):
-                        if len(values) != len(header):
-                            report.problems.append(
-                                f"{name} row {number}: {len(values)} fields for "
-                                f"{len(header)} headers"
+                    parsed_rows = csv.reader(
+                        reader.iter_text_lines(
+                            name,
+                            max_bytes=MAX_DATA_FILE_BYTES,
+                            max_line_chars=MAX_RECORD_CHARS,
+                        )
+                    )
+                    try:
+                        header = next(parsed_rows)
+                    except StopIteration:
+                        header = []
+                    if (
+                        not header
+                        or any(not field for field in header)
+                        or len(set(header)) != len(header)
+                    ):
+                        report.problems.append(f"{name}: CSV header is missing or ambiguous")
+                    elif len(header) > 256:
+                        report.problems.append(f"{name}: CSV header exceeds the field-count limit")
+                    else:
+                        for values in parsed_rows:
+                            number = parsed_rows.line_num
+                            if len(values) != len(header):
+                                report.problems.append(
+                                    f"{name} row {number}: {len(values)} fields for "
+                                    f"{len(header)} headers"
+                                )
+                                continue
+                            record = dict(zip(header, values, strict=True))
+                            count += 1
+                            _observe_primary_record(
+                                name,
+                                number,
+                                record,
+                                type_name,
+                                sites_by_type,
+                                distribution_counts,
+                                texts,
+                                validators,
+                                report,
                             )
-                            continue
-                        rows.append(dict(zip(header, values, strict=True)))
-                        if len(rows) > MAX_RECORDS_PER_OUTPUT:
-                            report.problems.append(f"{name}: exceeds the record-count limit")
-                            break
-            except csv.Error as exc:
-                report.problems.append(f"{name}: malformed CSV: {exc}")
-            finally:
-                csv.field_size_limit(previous_limit)
+                            if count > MAX_RECORDS_PER_OUTPUT:
+                                report.problems.append(f"{name}: exceeds the record-count limit")
+                                break
+                finally:
+                    csv.field_size_limit(previous_limit)
+        except (DatasetIOError, OSError, csv.Error, ValueError) as exc:
+            report.problems.append(f"{name}: parse failed safely: {exc}")
 
-        loaded[name] = tuple(rows)
-        if output["records"] != len(rows):
-            report.problems.append(f"{name}: records claim {output['records']}, actual {len(rows)}")
-    return loaded
+        record_counts[type_name] = count
+        if texts is not None:
+            document_texts[name] = texts
+        if output["records"] != count:
+            report.problems.append(f"{name}: records claim {output['records']}, actual {count}")
+
+    return _PrimaryScan(record_counts, distribution_counts, document_texts)
 
 
-def _record_counts(records: dict[str, tuple[dict[str, object], ...]]) -> dict[str, int]:
-    counts: dict[str, int] = {}
-    for name, rows in records.items():
-        suffix = ".jsonl" if name.endswith(".jsonl") else ".csv"
-        counts[name.removesuffix(suffix)] = len(rows)
-    return counts
+def _observe_primary_record(
+    name: str,
+    number: int,
+    record: Mapping[str, object],
+    type_name: str,
+    sites_by_type: dict[str, list[tuple[str, str, dict[str, str]]]],
+    distribution_counts: dict[str, Counter[str]],
+    texts: dict[str, str] | None,
+    validators: dict[str, Validator],
+    report: VerifyReport,
+) -> None:
+    for site, field_name, target in sites_by_type.get(type_name, []):
+        value = record.get(field_name)
+        if value is not None and str(value) in target:
+            distribution_counts[site][str(value)] += 1
+        elif value is not None:
+            report.problems.append(
+                f"stats.distributions site {site!r} omits observed value {value!r}"
+            )
+
+    if texts is not None:
+        doc_id = next((value for key, value in record.items() if key.endswith("_id")), None)
+        text = next(
+            (
+                value
+                for key, value in record.items()
+                if key in {"body", "description", "text", "note"} and isinstance(value, str)
+            ),
+            None,
+        )
+        if doc_id is not None and text is not None:
+            document_id = str(doc_id)
+            if document_id in texts:
+                report.problems.append(
+                    f"{name} line {number}: duplicate document id {document_id!r}"
+                )
+            else:
+                texts[document_id] = text
+
+    _sweep_record(name, number, record, validators, report)
 
 
 def _scaled(decimal_string: str) -> int:
@@ -495,42 +607,24 @@ def _proportion(count: int, total: int) -> str:
 
 def _check_manifest_claims(
     document: dict[str, Any],
-    records: dict[str, tuple[dict[str, object], ...]],
+    primary: _PrimaryScan,
     label_counts: Counter[str],
     report: VerifyReport,
     known_labels: frozenset[str],
 ) -> None:
     """Re-derive record, distribution, coverage, terms, and fixed-contract claims."""
-    actual_counts = _record_counts(records)
+    actual_counts = primary.record_counts
     if document["stats"]["record_counts"] != actual_counts:
         report.problems.append("stats.record_counts does not match parsed primary outputs")
     if document["recipe"]["parameters"]["records"] != actual_counts:
         report.problems.append("recipe.parameters.records does not match parsed primary outputs")
 
-    by_type = {
-        name.removesuffix(".jsonl").removesuffix(".csv"): rows for name, rows in records.items()
-    }
-    seen_sites: set[str] = set()
     for distribution in document["stats"]["distributions"]:
         site = distribution["site"]
-        if site in seen_sites:
-            report.problems.append(f"stats.distributions duplicates site {site!r}")
-            continue
-        seen_sites.add(site)
-        type_name, separator, field_name = site.partition("/")
-        if not separator or "/" in field_name or type_name not in by_type:
-            report.problems.append(f"stats.distributions site {site!r} does not resolve")
+        if site not in primary.distribution_counts:
             continue
         target = distribution["target"]
-        observed: Counter[str] = Counter()
-        for row in by_type[type_name]:
-            value = row.get(field_name)
-            if value is not None and str(value) in target:
-                observed[str(value)] += 1
-            elif value is not None:
-                report.problems.append(
-                    f"stats.distributions site {site!r} omits observed value {value!r}"
-                )
+        observed = primary.distribution_counts[site]
         total = sum(observed.values())
         achieved = {key: _proportion(observed[key], total) for key in sorted(target)}
         if distribution["achieved"] != achieved:
@@ -593,7 +687,7 @@ def _check_spans(
     document: dict[str, Any],
     report: VerifyReport,
     *,
-    records: dict[str, tuple[dict[str, object], ...]],
+    document_texts: dict[str, dict[str, str]],
     known_labels: frozenset[str],
 ) -> Counter[str]:
     """Re-extract every span from the text it indexes."""
@@ -609,26 +703,18 @@ def _check_spans(
             report.problems.append(f"{sidecar_name}: no data file named {stem}")
             continue
 
-        try:
-            texts = _document_texts(records.get(data_name, ()), data_name)
-            sidecar_text = reader.read_text(sidecar_name, max_bytes=MAX_DATA_FILE_BYTES)
-        except (DatasetIOError, OSError, ValueError) as exc:
-            report.problems.append(str(exc))
-            continue
+        texts = document_texts.pop(data_name, {})
         sidecar_ids: set[str] = set()
         sidecar_records = 0
-        for number, line in enumerate(sidecar_text.splitlines(), start=1):
+        for number, line in enumerate(
+            _stream_lines(reader, sidecar_name, report), start=1
+        ):
             if not line.strip():
                 continue
             sidecar_records += 1
             if sidecar_records > MAX_RECORDS_PER_OUTPUT:
                 report.problems.append(f"{sidecar_name}: exceeds the record-count limit")
                 break
-            if len(line) > MAX_RECORD_CHARS:
-                report.problems.append(
-                    f"{sidecar_name} line {number}: exceeds the record size limit"
-                )
-                continue
             try:
                 record = strict_json_loads(line, context=f"{sidecar_name} line {number}")
             except ValueError as exc:
@@ -720,6 +806,17 @@ def _check_spans(
     return label_counts
 
 
+def _stream_lines(reader: DatasetReader, name: str, report: VerifyReport) -> Iterator[str]:
+    try:
+        yield from reader.iter_text_lines(
+            name,
+            max_bytes=MAX_DATA_FILE_BYTES,
+            max_line_chars=MAX_RECORD_CHARS,
+        )
+    except (DatasetIOError, OSError, ValueError) as exc:
+        report.problems.append(str(exc))
+
+
 def _find_data_file(names: set[str], stem: str) -> str | None:
     for suffix in (".jsonl", ".csv"):
         candidate = f"{stem}{suffix}"
@@ -728,25 +825,10 @@ def _find_data_file(names: set[str], stem: str) -> str | None:
     return None
 
 
-def _document_texts(records: tuple[dict[str, object], ...], name: str) -> dict[str, str]:
-    """Map document id to text, for whichever field carries the document."""
-    texts: dict[str, str] = {}
-    for number, record in enumerate(records, start=1):
-        doc_id = next((v for k, v in record.items() if k.endswith("_id")), None)
-        if doc_id is None:
-            continue
-        document_id = str(doc_id)
-        if document_id in texts:
-            raise ValueError(f"{name} line {number}: duplicate document id {document_id!r}")
-        for key, value in record.items():
-            if key in {"body", "description", "text", "note"} and isinstance(value, str):
-                texts[document_id] = value
-                break
-    return texts
-
-
-def _sweep_identifiers(
-    records: dict[str, tuple[dict[str, object], ...]],
+def _sweep_record(
+    name: str,
+    number: int,
+    record: Mapping[str, object],
     validators: dict[str, Validator],
     report: VerifyReport,
 ) -> None:
@@ -764,15 +846,13 @@ def _sweep_identifiers(
     Scanning parsed values but matching unanchored would have the same problem
     inside any long alphanumeric field, so the pattern is anchored on both sides.
     """
-    for name, rows in sorted(records.items()):
-        for number, record in enumerate(rows, start=1):
-            for candidate in identifier_candidates(record):
-                for validator_name, validator in validators.items():
-                    if validator(candidate):
-                        report.checksum_valid_identifiers += 1
-                        if report.identifier_policy == "safe":
-                            report.problems.append(
-                                f"{name} line {number}: contains a checksum-valid "
-                                f"{validator_name} under a safe policy; safe mode is the "
-                                "product's safety claim"
-                            )
+    for candidate in identifier_candidates(record):
+        for validator_name, validator in validators.items():
+            if validator(candidate):
+                report.checksum_valid_identifiers += 1
+                if report.identifier_policy == "safe":
+                    report.problems.append(
+                        f"{name} line {number}: contains a checksum-valid "
+                        f"{validator_name} under a safe policy; safe mode is the "
+                        "product's safety claim"
+                    )

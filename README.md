@@ -13,7 +13,7 @@
 
 <p align="center">
   <a href="https://github.com/lokomotifai/mintmark/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/lokomotifai/mintmark/ci.yml?branch=main&amp;style=flat-square&amp;label=CI"></a>
-  <img alt="905 tests" src="https://img.shields.io/badge/tests-905-3C873A?style=flat-square">
+  <img alt="913 tests" src="https://img.shields.io/badge/tests-913-3C873A?style=flat-square">
   <img alt="18 invariants, each with a named test" src="https://img.shields.io/badge/invariants-18%20tested-3C873A?style=flat-square">
   <a href="https://github.com/lokomotifai/mintmark/releases/tag/v0.2.0"><img alt="Release v0.2.0" src="https://img.shields.io/badge/release-v0.2.0-3C873A?style=flat-square"></a>
   <a href="https://pypi.org/project/mintmark/"><img alt="On PyPI" src="https://img.shields.io/pypi/v/mintmark?style=flat-square&amp;label=PyPI&amp;color=3C873A"></a>

@@ -211,7 +211,7 @@
           "records": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 100000
+            "maximum": 1000000
           }
         }
       }
@@ -292,12 +292,12 @@
               "target": {
                 "type": "integer",
                 "minimum": 0,
-                "maximum": 100000
+                "maximum": 1000000
               },
               "achieved": {
                 "type": "integer",
                 "minimum": 0,
-                "maximum": 100000
+                "maximum": 1000000
               },
               "met": {
                 "type": "boolean"

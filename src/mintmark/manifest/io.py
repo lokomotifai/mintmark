@@ -7,11 +7,13 @@ symlink following, and parent-directory swap races from changing what is read.
 
 from __future__ import annotations
 
+import codecs
 import hashlib
 import json
 import os
 import re
 import stat
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -146,6 +148,77 @@ class DatasetReader:
             return self.read_bytes(name, max_bytes=max_bytes).decode("utf-8")
         except UnicodeDecodeError as exc:
             raise DatasetIOError(f"{name}: is not valid UTF-8") from exc
+
+    def iter_text_lines(
+        self, name: str, *, max_bytes: int, max_line_chars: int
+    ) -> Iterator[str]:
+        """Yield UTF-8 physical lines without materializing an untrusted file.
+
+        The complete byte stream is still hashed and pinned to the same file
+        identity used by checksum verification. A line budget bounds the only
+        buffer retained between chunks, including files with no line breaks.
+        """
+        descriptor = self._open_regular(name)
+        digest = hashlib.sha256()
+        size = 0
+        decoder = codecs.getincrementaldecoder("utf-8")("strict")
+        buffer = ""
+        try:
+            before = os.fstat(descriptor)
+            if before.st_size > max_bytes:
+                raise DatasetIOError(
+                    f"{name}: {before.st_size} bytes exceeds the "
+                    f"{max_bytes}-byte verification limit"
+                )
+            while True:
+                chunk = os.read(descriptor, 1 << 20)
+                if not chunk:
+                    break
+                size += len(chunk)
+                if size > max_bytes:
+                    raise DatasetIOError(
+                        f"{name}: exceeds the {max_bytes}-byte verification limit"
+                    )
+                digest.update(chunk)
+                try:
+                    buffer += decoder.decode(chunk)
+                except UnicodeDecodeError as exc:
+                    raise DatasetIOError(f"{name}: is not valid UTF-8") from exc
+
+                while True:
+                    positions = [
+                        position
+                        for mark in ("\n", "\r")
+                        if (position := buffer.find(mark)) >= 0
+                    ]
+                    if not positions:
+                        break
+                    position = min(positions)
+                    if buffer[position] == "\r" and position + 1 == len(buffer):
+                        break
+                    end = position + 1
+                    if buffer[position : position + 2] == "\r\n":
+                        end += 1
+                    line, buffer = buffer[:end], buffer[end:]
+                    if len(line) > max_line_chars:
+                        raise DatasetIOError(f"{name}: exceeds the line-size limit")
+                    yield line
+                if len(buffer) > max_line_chars:
+                    raise DatasetIOError(f"{name}: exceeds the line-size limit")
+
+            try:
+                buffer += decoder.decode(b"", final=True)
+            except UnicodeDecodeError as exc:
+                raise DatasetIOError(f"{name}: is not valid UTF-8") from exc
+            if buffer:
+                if len(buffer) > max_line_chars:
+                    raise DatasetIOError(f"{name}: exceeds the line-size limit")
+                yield buffer
+            after = os.fstat(descriptor)
+            self._assert_stable(name, before, after)
+            self._pin(name, after, digest.hexdigest())
+        finally:
+            os.close(descriptor)
 
     def digest(self, name: str, *, max_bytes: int = MAX_DATA_FILE_BYTES) -> tuple[str, int]:
         descriptor = self._open_regular(name)

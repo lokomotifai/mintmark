@@ -245,6 +245,67 @@ def test_dataset_reader_detects_a_second_file_version(dataset: Path) -> None:
 
 
 @pytest.mark.adversarial
+def test_dataset_reader_streams_utf8_lines_and_pins_the_digest(tmp_path: Path) -> None:
+    from mintmark.manifest.io import DatasetReader
+
+    dataset = tmp_path / "streamed"
+    dataset.mkdir()
+    path = dataset / "data.jsonl"
+    path.write_text("{\"name\":\"Çağrı\"}\r\n{\"name\":\"İpek\"}\n", encoding="utf-8")
+
+    with DatasetReader(dataset) as reader:
+        lines = list(reader.iter_text_lines("data.jsonl", max_bytes=1024, max_line_chars=128))
+        assert lines == ['{"name":"Çağrı"}\r\n', '{"name":"İpek"}\n']
+        assert reader.digest("data.jsonl", max_bytes=1024)[1] == path.stat().st_size
+
+
+@pytest.mark.adversarial
+def test_dataset_reader_rejects_an_unbroken_oversized_line(tmp_path: Path) -> None:
+    from mintmark.manifest.io import DatasetIOError, DatasetReader
+
+    dataset = tmp_path / "streamed"
+    dataset.mkdir()
+    (dataset / "data.jsonl").write_text("x" * 129, encoding="utf-8")
+
+    with (
+        DatasetReader(dataset) as reader,
+        pytest.raises(DatasetIOError, match="line-size limit"),
+    ):
+        list(reader.iter_text_lines("data.jsonl", max_bytes=1024, max_line_chars=128))
+
+
+@pytest.mark.adversarial
+def test_verifier_rejects_an_aggregate_dataset_claim_above_its_budget(dataset: Path) -> None:
+    from mintmark.api import verify
+    from mintmark.manifest.verify import MAX_VERIFY_DATASET_BYTES
+
+    path = dataset / MANIFEST_FILENAME
+    document = json.loads(path.read_text(encoding="utf-8"))
+    assert len(document["outputs"]) >= 3
+    for output in document["outputs"]:
+        output["bytes"] = 256 << 20
+    path.write_text(json.dumps(document, ensure_ascii=False) + "\n", encoding="utf-8")
+
+    report = verify(dataset)
+    assert not report.ok
+    assert any(
+        f"aggregate verification limit is {MAX_VERIFY_DATASET_BYTES}" in problem
+        for problem in report.problems
+    )
+
+
+def test_verifier_bounds_repeated_diagnostics() -> None:
+    from mintmark.manifest.verify import MAX_VERIFY_PROBLEMS, VerifyReport
+
+    report = VerifyReport(directory="hostile")
+    for number in range(MAX_VERIFY_PROBLEMS * 2):
+        report.problems.append(f"problem {number}")
+
+    assert len(report.problems) == MAX_VERIFY_PROBLEMS + 1
+    assert report.problems[-1].endswith("remaining omitted")
+
+
+@pytest.mark.adversarial
 def test_duplicate_keys_in_data_records_are_rejected_after_resealing(dataset: Path) -> None:
     from mintmark.api import verify
 
