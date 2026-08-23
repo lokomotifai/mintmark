@@ -449,9 +449,7 @@ def _scan_primary_records(
     document_texts: dict[str, dict[str, str]] = {}
     for output, name, type_name, fmt in primary_outputs:
         count = 0
-        texts: dict[str, str] | None = (
-            {} if f"{type_name}.labels.jsonl" in names else None
-        )
+        texts: dict[str, str] | None = {} if f"{type_name}.labels.jsonl" in names else None
 
         try:
             if fmt == "jsonl":
@@ -706,9 +704,7 @@ def _check_spans(
         texts = document_texts.pop(data_name, {})
         sidecar_ids: set[str] = set()
         sidecar_records = 0
-        for number, line in enumerate(
-            _stream_lines(reader, sidecar_name, report), start=1
-        ):
+        for number, line in enumerate(_stream_lines(reader, sidecar_name, report), start=1):
             if not line.strip():
                 continue
             sidecar_records += 1

@@ -514,9 +514,7 @@ def _pack_safety(pack_root: Path, loaded: Any) -> tuple[Any, list[str]]:
             problems.append(f"{source}: {hit.render()}")
         for candidate in identifier_candidates(surface):
             valid_as = [
-                name
-                for name, engine in CHECKSUMMED.items()
-                if engine.is_checksum_valid(candidate)
+                name for name, engine in CHECKSUMMED.items() if engine.is_checksum_valid(candidate)
             ]
             if valid_as:
                 problems.append(

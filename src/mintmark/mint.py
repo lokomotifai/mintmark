@@ -778,9 +778,10 @@ def _write(
             record_count = 0
             ids: list[str] = []
             sidecar_name = f"{record_type.type_name}.labels.jsonl"
-            has_sidecar = bool(record_type.document_fields) and context.counts.get(
-                record_type.type_name, 0
-            ) > 0
+            has_sidecar = (
+                bool(record_type.document_fields)
+                and context.counts.get(record_type.type_name, 0) > 0
+            )
             with ExitStack() as stack:
                 handle = stack.enter_context(staged.open(name))
                 sidecar_handle = (

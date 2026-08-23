@@ -251,7 +251,7 @@ def test_dataset_reader_streams_utf8_lines_and_pins_the_digest(tmp_path: Path) -
     dataset = tmp_path / "streamed"
     dataset.mkdir()
     path = dataset / "data.jsonl"
-    path.write_text("{\"name\":\"Çağrı\"}\r\n{\"name\":\"İpek\"}\n", encoding="utf-8")
+    path.write_text('{"name":"Çağrı"}\r\n{"name":"İpek"}\n', encoding="utf-8")
 
     with DatasetReader(dataset) as reader:
         lines = list(reader.iter_text_lines("data.jsonl", max_bytes=1024, max_line_chars=128))

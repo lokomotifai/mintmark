@@ -122,14 +122,17 @@ def test_no_children_from_no_parents_is_fine() -> None:
 
 
 def test_a_recipe_can_disable_a_child_record_type() -> None:
-    assert assign_children(
-        factory(),
-        site="evaluation/customer_id",
-        parent_count=50,
-        child_count=0,
-        counts=(1,),
-        weights=("1",),
-    ) == []
+    assert (
+        assign_children(
+            factory(),
+            site="evaluation/customer_id",
+            parent_count=50,
+            child_count=0,
+            counts=(1,),
+            weights=("1",),
+        )
+        == []
+    )
 
 
 def test_the_distribution_shapes_the_allocation() -> None:

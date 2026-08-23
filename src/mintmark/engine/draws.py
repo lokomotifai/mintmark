@@ -141,8 +141,7 @@ def weighted_index_scaled(stream: SplitMix64, scaled: Sequence[int]) -> int:
     if not scaled:
         raise ValueError("scaled weights must not be empty")
     if any(
-        not isinstance(weight, int) or isinstance(weight, bool) or weight < 0
-        for weight in scaled
+        not isinstance(weight, int) or isinstance(weight, bool) or weight < 0 for weight in scaled
     ):
         raise ValueError("scaled weights must be non-negative integers")
     total = sum(scaled)
