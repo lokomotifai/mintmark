@@ -180,5 +180,9 @@ def test_release_scans_and_seals_the_exact_built_artifacts_before_oidc() -> None
     )
     assert publisher["uses"].startswith("pypa/gh-action-pypi-publish@")
     assert publisher["with"]["verify-metadata"] is True
+    github_release = next(
+        step for step in publish_steps if "gh release create" in step.get("run", "")
+    )
+    assert github_release["env"]["GH_REPO"] == "${{ github.repository }}"
     canary = next(step for step in build_steps if "MINTMARK_CANARY" in step.get("env", {}))
     assert "refs/tags/v" in canary.get("if", "")

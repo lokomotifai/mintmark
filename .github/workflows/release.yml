@@ -152,6 +152,7 @@ jobs:
             dist/mintmark-*.tar.gz
       - name: Publish the release without rebuilding
         env:
+          GH_REPO: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
