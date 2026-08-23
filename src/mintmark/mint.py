@@ -21,7 +21,8 @@ interrupted mint leaves no directory that looks like a dataset.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import ExitStack
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 from datetime import UTC, datetime, timedelta
@@ -37,7 +38,6 @@ from mintmark.annotate import (
     pin,
     pin_digest,
     render,
-    write_sidecar,
 )
 from mintmark.emit import csv_header, render_csv_row, render_record, staged_output
 from mintmark.engine.draws import (
@@ -46,7 +46,6 @@ from mintmark.engine.draws import (
     bounded_range,
     datetime_in_window,
     scale_weights,
-    weighted_index,
     weighted_index_scaled,
 )
 from mintmark.engine.prng import SplitMix64
@@ -79,6 +78,7 @@ from mintmark.manifest import (
     render_sums,
 )
 from mintmark.manifest.document import SUPPORTED_PLATFORMS
+from mintmark.manifest.io import MAX_DATA_FILE_BYTES
 from mintmark.manifest.safety import identifier_candidates
 from mintmark.packs.model import (
     Field,
@@ -91,6 +91,7 @@ from mintmark.packs.model import (
 
 ENGINE_MAJOR = 0
 TURKEY_OFFSET = "+03:00"
+MAX_DATASET_OUTPUT_BYTES = 512 << 20
 
 KNOWN_IDENTIFIERS = frozenset(ALL_ENGINES)
 KNOWN_LABELS = frozenset(label.value for label in Label)
@@ -264,17 +265,6 @@ def mint(
     )
     context.compile_templates()
 
-    generated: dict[str, list[Record]] = {}
-    sidecars: dict[str, list[SidecarRecord]] = {}
-    for record_type in loaded.record_types:
-        rows, docs = context.generate_type(record_type, generated)
-        generated[record_type.type_name] = rows
-        if docs:
-            sidecars[record_type.type_name] = docs
-
-    if policy is IdentifierPolicy.SAFE:
-        _assert_safe_records(generated)
-
     return _write(
         target=target,
         loaded=loaded,
@@ -282,8 +272,6 @@ def mint(
         seed=seed,
         policy=policy,
         fmt=fmt,
-        generated=generated,
-        sidecars=sidecars,
         context=context,
         overrides=overrides,
         invocation=invocation,
@@ -306,6 +294,9 @@ class _MintContext:
         default_factory=dict
     )
     _descriptors: dict[Label, tuple[str, ...]] = dataclass_field(default_factory=dict)
+    _weighted_fields: dict[str, tuple[tuple[str, ...], tuple[int, ...]]] = dataclass_field(
+        default_factory=dict
+    )
 
     def compile_templates(self) -> None:
         """Compile every declared template before any records are generated."""
@@ -354,44 +345,43 @@ class _MintContext:
         return core_lexicon(name)
 
     def generate_type(
-        self, record_type: RecordType, generated: dict[str, list[Record]]
-    ) -> tuple[list[Record], list[SidecarRecord]]:
+        self, record_type: RecordType, parent_ids: dict[str, list[str]]
+    ) -> Iterator[tuple[Record, SidecarRecord | None]]:
+        """Yield records and sidecars without retaining the generated dataset."""
         count = self.counts.get(record_type.type_name, 0)
-        assignments = self._reference_assignments(record_type, generated, count)
+        assignments = self._reference_assignments(record_type, parent_ids, count)
 
-        rows: list[Record] = []
-        documents: list[SidecarRecord] = []
         for index in range(count):
             row: Record = {}
             graph = {record_type.type_name: row}
             for declared in record_type.fields:
-                value = self._field_value(record_type, declared, index, row, assignments, generated)
+                value = self._field_value(
+                    record_type, declared, index, row, assignments, parent_ids
+                )
                 row[declared.name] = value
 
+            sidecar: SidecarRecord | None = None
             doc_fields = record_type.document_fields
             if doc_fields:
                 text, spans = self._render_document(record_type, index, row, graph)
                 row[doc_fields[0].name] = text
-                documents.append(
-                    SidecarRecord(
-                        doc_id=str(row[record_type.fields[0].name]),
-                        text=text,
-                        spans=tuple(spans),
-                    )
+                sidecar = SidecarRecord(
+                    doc_id=str(row[record_type.fields[0].name]),
+                    text=text,
+                    spans=tuple(spans),
                 )
                 for span in spans:
                     self.coverage[span.label.value] = self.coverage.get(span.label.value, 0) + 1
-            rows.append(row)
-        return rows, documents
+            yield row, sidecar
 
     def _reference_assignments(
-        self, record_type: RecordType, generated: dict[str, list[Record]], count: int
+        self, record_type: RecordType, parent_ids: dict[str, list[str]], count: int
     ) -> dict[str, list[int]]:
         assignments: dict[str, list[int]] = {}
         for declared in record_type.fields:
             if declared.type != "ref" or declared.ref is None:
                 continue
-            parents = generated.get(declared.ref.parent, [])
+            parents = parent_ids.get(declared.ref.parent, [])
             assignments[declared.name] = assign_children(
                 self.factory,
                 site=f"{record_type.type_name}/{declared.name}",
@@ -409,7 +399,7 @@ class _MintContext:
         index: int,
         row: Record,
         assignments: dict[str, list[int]],
-        generated: dict[str, list[Record]],
+        parent_ids: dict[str, list[str]],
     ) -> Any:
         site = f"{record_type.type_name}/{index}/{declared.name}"
         stream = self.factory.stream(site)
@@ -426,10 +416,9 @@ class _MintContext:
         # generator instead of the type made every reference resolve to the
         # child's own identifier: well formed, and pointing at the wrong record.
         if declared.type == "ref":
-            parents = generated[declared.ref.parent]  # type: ignore[union-attr]
+            parents = parent_ids[declared.ref.parent]  # type: ignore[union-attr]
             parent_index = assignments[declared.name][index]
-            parent_type = self.pack.record_type(declared.ref.parent)  # type: ignore[union-attr]
-            return parents[parent_index][parent_type.fields[0].name]
+            return parents[parent_index]
 
         if kind == "seq_id":
             return entity_id(record_type.id_prefix, index)
@@ -444,16 +433,24 @@ class _MintContext:
             return values[bounded(stream, len(values))]
 
         if kind == "enum_weighted":
-            options = [str(v) for v in params.get("values", [])]
-            weights = [str(w) for w in params.get("weights", [])]
+            field_site = f"{record_type.type_name}/{declared.name}"
+            compiled = self._weighted_fields.get(field_site)
+            if compiled is None:
+                options = tuple(str(v) for v in params.get("values", []))
+                weights = tuple(scale_weights([str(w) for w in params.get("weights", [])]))
+                compiled = (options, weights)
+                self._weighted_fields[field_site] = compiled
+            options, weights = compiled
             tally = self.tallies.setdefault(
-                f"{record_type.type_name}/{declared.name}",
+                field_site,
                 DistributionTally(
-                    site=f"{record_type.type_name}/{declared.name}",
-                    targets=dict(zip(options, weights, strict=True)),
+                    site=field_site,
+                    targets=dict(
+                        zip(options, (str(w) for w in params.get("weights", [])), strict=True)
+                    ),
                 ),
             )
-            value = options[weighted_index(stream, weights)]
+            value = options[weighted_index_scaled(stream, weights)]
             tally.observe(value)
             return value
 
@@ -642,17 +639,15 @@ def _field_slot_paths(nodes: tuple[Node, ...]) -> Sequence[str]:
     return paths
 
 
-def _assert_safe_records(generated: dict[str, list[Record]]) -> None:
-    """Prove the safe-policy claim against final values, regardless of their source."""
-    for type_name, rows in generated.items():
-        for index, row in enumerate(rows):
-            for candidate in identifier_candidates(row):
-                for identifier_name, engine in CHECKSUMMED.items():
-                    if engine.is_checksum_valid(candidate):
-                        raise MintError(
-                            f"safe-policy invariant failed at {type_name} record {index}: "
-                            f"output contains a checksum-valid {identifier_name}"
-                        )
+def _assert_safe_record(type_name: str, index: int, row: Record) -> None:
+    """Prove the safe-policy claim on a final row before its staging write."""
+    for candidate in identifier_candidates(row):
+        for identifier_name, engine in CHECKSUMMED.items():
+            if engine.is_checksum_valid(candidate):
+                raise MintError(
+                    f"safe-policy invariant failed at {type_name} record {index}: "
+                    f"output contains a checksum-valid {identifier_name}"
+                )
 
 
 _CORE_LEXICON_CACHE: dict[str, list[str]] = {}
@@ -733,8 +728,6 @@ def _write(
     seed: int,
     policy: IdentifierPolicy,
     fmt: str,
-    generated: dict[str, list[Record]],
-    sidecars: dict[str, list[SidecarRecord]],
     context: _MintContext,
     overrides: dict[str, Any],
     invocation: str,
@@ -752,37 +745,82 @@ def _write(
         identifier_policy=policy.value,
         fmt=fmt,
     )
+    output_records: dict[str, int] = {}
+    parent_ids: dict[str, list[str]] = {}
+    referenced_types = {
+        field.ref.parent
+        for record_type in loaded.record_types
+        for field in record_type.fields
+        if field.ref is not None
+    }
+    output_bytes: dict[str, int] = {}
+    total_output_bytes = 0
+
+    def write_bounded(handle: Any, name: str, text: str) -> None:
+        nonlocal total_output_bytes
+        size = len(text.encode("utf-8"))
+        file_size = output_bytes.get(name, 0) + size
+        if file_size > MAX_DATA_FILE_BYTES:
+            raise MintError(
+                f"output-byte-limit: {name} exceeds the {MAX_DATA_FILE_BYTES}-byte file limit"
+            )
+        if total_output_bytes + size > MAX_DATASET_OUTPUT_BYTES:
+            raise MintError(
+                "dataset-output-byte-limit: generated data exceeds the "
+                f"{MAX_DATASET_OUTPUT_BYTES}-byte aggregate limit"
+            )
+        handle.write(text)
+        output_bytes[name] = file_size
+        total_output_bytes += size
 
     with staged_output(target) as staged:
         for record_type in loaded.record_types:
-            rows = generated.get(record_type.type_name, [])
             order = tuple(f.name for f in record_type.fields)
             name = f"{record_type.type_name}.{fmt}"
-            with staged.open(name) as handle:
+            record_count = 0
+            ids: list[str] = []
+            sidecar_name = f"{record_type.type_name}.labels.jsonl"
+            has_sidecar = bool(record_type.document_fields) and context.counts.get(
+                record_type.type_name, 0
+            ) > 0
+            with ExitStack() as stack:
+                handle = stack.enter_context(staged.open(name))
+                sidecar_handle = (
+                    stack.enter_context(staged.open(sidecar_name)) if has_sidecar else None
+                )
                 if fmt == "csv":
-                    handle.write(csv_header(order))
-                    for row in rows:
-                        handle.write(render_csv_row(row, order))
-                else:
-                    for row in rows:
-                        handle.write(render_record(row, order) + "\n")
+                    write_bounded(handle, name, csv_header(order))
+                for index, (row, sidecar) in enumerate(
+                    context.generate_type(record_type, parent_ids)
+                ):
+                    if policy is IdentifierPolicy.SAFE:
+                        _assert_safe_record(record_type.type_name, index, row)
+                    line = (
+                        render_csv_row(row, order)
+                        if fmt == "csv"
+                        else render_record(row, order) + "\n"
+                    )
+                    write_bounded(handle, name, line)
+                    if record_type.type_name in referenced_types:
+                        ids.append(str(row[record_type.fields[0].name]))
+                    record_count += 1
+                    if sidecar is not None and sidecar_handle is not None:
+                        write_bounded(sidecar_handle, sidecar_name, sidecar.render() + "\n")
+            parent_ids[record_type.type_name] = ids
             summary.outputs.append(name)
-            summary.record_counts[record_type.type_name] = len(rows)
+            summary.record_counts[record_type.type_name] = record_count
+            output_records[name] = record_count
 
-            if record_type.type_name in sidecars:
-                sidecar_name = f"{record_type.type_name}.labels.jsonl"
-                with staged.open(sidecar_name) as handle:
-                    write_sidecar(handle, sidecars[record_type.type_name])
+            if has_sidecar:
                 summary.outputs.append(sidecar_name)
+                output_records[sidecar_name] = record_count
 
         outputs = tuple(
             OutputFile(
                 path=name,
                 bytes=(staged.path / name).stat().st_size,
                 sha256=file_digest(staged.path / name),
-                records=summary.record_counts.get(name.split(".")[0], 0)
-                if not name.endswith(".labels.jsonl")
-                else len(sidecars.get(name.split(".")[0], [])),
+                records=output_records[name],
             )
             for name in sorted(summary.outputs)
         )

@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 from typing import Any
 
-from mintmark.engine.draws import bounded, weighted_index
+from mintmark.engine.draws import bounded, scale_weights, weighted_index, weighted_index_scaled
 from mintmark.engine.streams import StreamFactory
 
 # One record is an ordered mapping of field name to emitted value. Order is the
@@ -131,9 +131,10 @@ def assign_children(
         return []
 
     per_parent: list[int] = []
+    scaled_weights = scale_weights(list(weights))
     for parent_index in range(parent_count):
         stream = factory.stream(f"{site}/{parent_index}/count")
-        per_parent.append(counts[weighted_index(stream, list(weights))])
+        per_parent.append(counts[weighted_index_scaled(stream, scaled_weights)])
 
     total = sum(per_parent)
     if total > child_count:

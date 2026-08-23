@@ -109,6 +109,18 @@ def test_runtime_record_override_uses_the_same_budget(tmp_path: Path) -> None:
     assert not out.exists()
 
 
+def test_generated_output_bytes_are_bounded_before_publication(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import mintmark.mint as mint_module
+
+    monkeypatch.setattr(mint_module, "MAX_DATA_FILE_BYTES", 512)
+    out = tmp_path / "out"
+    with pytest.raises(MintError, match="output-byte-limit"):
+        mint(pack=CONFORMANCE, recipe="full", seed=1, out=out, invocation="pytest")
+    assert not out.exists()
+
+
 def test_pack_lexicon_rejects_structured_values_instead_of_stringifying_them(
     tmp_path: Path,
 ) -> None:

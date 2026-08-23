@@ -149,7 +149,9 @@ def test_template_weights_decide_the_draw(tmp_path: Path):
     assert counts["transfer_to_person"] > counts["bill_payment"] * 1.8
 
 
-def test_template_weights_are_scaled_once_per_mint(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+def test_generation_weights_are_scaled_once_per_declaration(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
     import mintmark.mint as mint_module
 
     calls = 0
@@ -163,7 +165,13 @@ def test_template_weights_are_scaled_once_per_mint(monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(mint_module, "scale_weights", counted)
     mint(pack=EXAMPLE, recipe="demo", seed=9, out=tmp_path / "run", records={"transaction": 400})
 
-    assert calls == len(load_pack(EXAMPLE).template_sets)
+    loaded = load_pack(EXAMPLE)
+    weighted_fields = sum(
+        field.generator_kind == "enum_weighted"
+        for record_type in loaded.record_types
+        for field in record_type.fields
+    )
+    assert calls == len(loaded.template_sets) + weighted_fields
 
 
 # Coverage targets.
