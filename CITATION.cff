@@ -17,7 +17,7 @@ abstract: A generation engine for fully synthetic, Turkish-first labeled dataset
   a manifest that lets anyone re-derive the identical bytes. Code is Apache-2.0; datasets
   minted from any pack in this family carry CC-BY-4.0.
 type: software
-version: 0.2.0
+version: 0.2.1
 authors:
 - family-names: Guner
   given-names: Fatih

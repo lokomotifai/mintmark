@@ -11,6 +11,28 @@ output for a fixed set of inputs. A change that alters emitted bytes for a fixed
 seed is a major version event even when no signature changed, because it breaks
 the reproducibility of every published manifest.
 
+## 0.2.1 - 2026-08-23
+
+### Security
+
+- Template, enum, and reference-distribution weights are scaled once per
+  declaration rather than reparsed in record-count-multiplied hot loops. Pack
+  entity lexicon references are unique and bounded, and their surfaces are
+  composed once per mint.
+- Mint generation streams records and label sidecars into the private staging
+  directory. It retains only reference identifiers, enforces per-file and
+  aggregate output-byte budgets, and still commits atomically after the safe
+  identifier invariant succeeds.
+- Dataset verification streams JSONL, CSV, and label sidecars under line, file,
+  aggregate-byte, record, and diagnostic-count budgets. Semantic claims are
+  accumulated without retaining every parsed record.
+- Validator identifier mode now requires an affirmative caller choice even when
+  a recipe requires it. An omitted CLI or API policy is always `safe`; recipe
+  binding and exact-policy reproduction remain enforced.
+
+No generated record or sidecar bytes move for the same pack, recipe, seed,
+format, and explicit policy. Manifests record the patch engine version.
+
 ## 0.2.0 - 2026-08-23
 
 A security and conformance review of the three sector packs found one defect
