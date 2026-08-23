@@ -18,6 +18,7 @@ import pytest
 
 from mintmark.annotate import Label
 from mintmark.api import verify
+from mintmark.cli import EXIT_INVALID_PACK, main
 from mintmark.engine.prng import SplitMix64
 from mintmark.engine.streams import StreamFactory
 from mintmark.identifiers import IdentifierPolicy
@@ -42,6 +43,24 @@ def _edit(path: Path, old: str, new: str) -> None:
     text = path.read_text(encoding="utf-8")
     assert old in text, f"{path.name} does not contain {old!r}"
     path.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+
+def test_infeasible_recipe_relationship_totals_are_refused(pack_copy: Path) -> None:
+    _edit(pack_copy / "recipes" / "demo.yaml", "transaction: 100", "transaction: 99")
+    with pytest.raises(PackError, match="infeasible-reference-cardinality"):
+        load_pack(pack_copy)
+
+
+@pytest.mark.parametrize("unsafe", ["Akbank", "4111111111111111"])
+def test_packcheck_exhaustively_rejects_unsafe_enum_literals(
+    pack_copy: Path, unsafe: str
+) -> None:
+    _edit(
+        pack_copy / "fields" / "transaction.yaml",
+        "values: [mobil, internet, pos, atm, sube]",
+        f"values: [mobil, internet, pos, atm, {unsafe}]",
+    )
+    assert main(["packcheck", str(pack_copy)]) == EXIT_INVALID_PACK
 
 
 # The recipe is binding, and the caller must still opt in to validator mode.
@@ -141,7 +160,13 @@ def test_the_sweep_still_fails_a_safe_dataset_that_carries_a_valid_identifier(tm
 def test_template_weights_decide_the_draw(tmp_path: Path):
     """The defect: every set was an even mix whatever the pack declared."""
     out = tmp_path / "run"
-    mint(pack=EXAMPLE, recipe="demo", seed=9, out=out, records={"transaction": 4000})
+    mint(
+        pack=EXAMPLE,
+        recipe="demo",
+        seed=9,
+        out=out,
+        records={"customer": 2000, "transaction": 4000},
+    )
     counts: collections.Counter[str] = collections.Counter()
     for line in (out / "transaction.jsonl").read_text(encoding="utf-8").splitlines():
         text = json.loads(line)["description"]
@@ -173,7 +198,13 @@ def test_generation_weights_are_scaled_once_per_declaration(
         return original(weights)
 
     monkeypatch.setattr(mint_module, "scale_weights", counted)
-    mint(pack=EXAMPLE, recipe="demo", seed=9, out=tmp_path / "run", records={"transaction": 400})
+    mint(
+        pack=EXAMPLE,
+        recipe="demo",
+        seed=9,
+        out=tmp_path / "run",
+        records={"customer": 200, "transaction": 400},
+    )
 
     loaded = load_pack(EXAMPLE)
     weighted_fields = sum(
@@ -212,7 +243,21 @@ def test_a_mint_that_overrode_its_record_counts_is_exempt(tmp_path: Path):
     """`packcheck` mini-mints twenty-five records against targets in the
     hundreds. A shrunken run is not a claim the recipe made."""
     out = tmp_path / "small"
-    mint(pack=CONFORMANCE, recipe="full", seed=3, out=out, records={"customer": 5})
+    mint(
+        pack=CONFORMANCE,
+        recipe="full",
+        seed=3,
+        out=out,
+        records={
+            "customer": 5,
+            "account": 5,
+            "card": 5,
+            "transaction": 5,
+            "complaint_ticket": 5,
+            "kyc_note": 5,
+            "support_transcript": 5,
+        },
+    )
     report = verify(out)
     assert report.ok
     assert report.coverage_checked is False
@@ -276,7 +321,13 @@ def test_a_pack_can_add_surfaces_to_an_entity_label(pack_copy: Path, tmp_path: P
     assert loaded.entity_lexicons == {"ORG": ("employers_fictional",)}
 
     out = tmp_path / "run"
-    mint(pack=pack_copy, recipe="demo", seed=4, out=out, records={"transaction": 600})
+    mint(
+        pack=pack_copy,
+        recipe="demo",
+        seed=4,
+        out=out,
+        records={"customer": 300, "transaction": 600},
+    )
     surfaces = _org_surfaces(out)
     assert {"Zeytinli Ambalaj", "Karadut Yazilim"} & surfaces, "the pack list never reached a draw"
     assert len(surfaces) > 12, "the core list is a floor, not a replacement"
@@ -383,7 +434,13 @@ def test_a_lex_slot_renders_a_lexicon_value_without_labelling_it(pack_copy: Path
         "Fatura odemesi {lex:perils_tr} (tamamlandi|gerceklesti)",
     )
     out = tmp_path / "run"
-    mint(pack=pack_copy, recipe="demo", seed=5, out=out, records={"transaction": 400})
+    mint(
+        pack=pack_copy,
+        recipe="demo",
+        seed=5,
+        out=out,
+        records={"customer": 200, "transaction": 400},
+    )
     text = (out / "transaction.jsonl").read_text(encoding="utf-8")
     assert "cam kirilmasi" in text or "su basmasi" in text
 

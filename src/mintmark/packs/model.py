@@ -616,6 +616,26 @@ def _cross_validate(
                 path, record_type, declared, known_types, order_of, template_sets, lexicons
             )
 
+    for recipe_name, recipe in recipes.items():
+        for record_type in record_types:
+            child_count = recipe.records.get(record_type.type_name, 0)
+            for declared in record_type.fields:
+                if declared.ref is None:
+                    continue
+                parent_count = recipe.records.get(declared.ref.parent, 0)
+                minimum = min(declared.ref.counts)
+                maximum = max(declared.ref.counts)
+                low, high = parent_count * minimum, parent_count * maximum
+                if not low <= child_count <= high:
+                    raise PackError(
+                        root / "recipes" / f"{recipe_name}.yaml",
+                        f"records/{record_type.type_name}",
+                        "infeasible-reference-cardinality",
+                        f"{child_count} records cannot satisfy {minimum}..{maximum} per "
+                        f"{declared.ref.parent} across {parent_count} parents; feasible "
+                        f"total is {low}..{high}",
+                    )
+
     _check_everything_declared_is_reachable(
         root, record_types, template_sets, lexicons, entity_lexicons, manifest_path
     )

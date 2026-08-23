@@ -118,9 +118,9 @@ def assign_children(
     """Return one parent index per child, honoring the count distribution.
 
     The distribution says how many children each parent should have. The recipe
-    says how many children exist. When they disagree, the distribution shapes the
-    allocation and the recipe's count wins on total, with the remainder walked
-    deterministically from parent zero upward.
+    says how many children exist. The requested total must fit the declared
+    per-parent minimum and maximum; deterministic adjustment never crosses those
+    bounds.
     """
     if parent_count <= 0:
         if child_count > 0:
@@ -129,6 +129,17 @@ def assign_children(
                 "a reference cannot dangle"
             )
         return []
+
+    minimum = min(counts)
+    maximum = max(counts)
+    minimum_total = parent_count * minimum
+    maximum_total = parent_count * maximum
+    if not minimum_total <= child_count <= maximum_total:
+        raise ValueError(
+            f"{site}: {child_count} children cannot satisfy {minimum}..{maximum} "
+            f"children for each of {parent_count} parents; feasible total is "
+            f"{minimum_total}..{maximum_total}"
+        )
 
     per_parent: list[int] = []
     scaled_weights = scale_weights(list(weights))
@@ -144,21 +155,26 @@ def assign_children(
         for parent_index in range(parent_count - 1, -1, -1):
             if surplus == 0:
                 break
-            take = min(per_parent[parent_index], surplus)
+            take = min(per_parent[parent_index] - minimum, surplus)
             per_parent[parent_index] -= take
             surplus -= take
     elif total < child_count:
         deficit = child_count - total
         parent_index = 0
         while deficit > 0:
-            per_parent[parent_index % parent_count] += 1
+            selected = parent_index % parent_count
             parent_index += 1
-            deficit -= 1
+            if per_parent[selected] < maximum:
+                per_parent[selected] += 1
+                deficit -= 1
+
+    if sum(per_parent) != child_count:
+        raise AssertionError(f"{site}: bounded relationship allocation did not converge")
 
     assignment: list[int] = []
     for parent_index, count in enumerate(per_parent):
         assignment.extend([parent_index] * count)
-    return assignment[:child_count]
+    return assignment
 
 
 @dataclass(slots=True)

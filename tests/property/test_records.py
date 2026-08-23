@@ -44,15 +44,16 @@ def test_a_negative_index_is_refused() -> None:
     seed=st.integers(0, 2**32),
 )
 def test_every_child_points_at_a_real_parent(parents: int, children: int, seed: int) -> None:
+    feasible_children = parents + children % (2 * parents + 1)
     assignment = assign_children(
         factory(seed),
         site="account/customer_id",
         parent_count=parents,
-        child_count=children,
+        child_count=feasible_children,
         counts=(1, 2, 3),
         weights=("0.55", "0.30", "0.15"),
     )
-    assert len(assignment) == children
+    assert len(assignment) == feasible_children
     assert all(0 <= parent < parents for parent in assignment)
 
 
@@ -135,7 +136,35 @@ def test_the_distribution_shapes_the_allocation() -> None:
         per_parent[parent] = per_parent.get(parent, 0) + 1
     observed = sorted(per_parent.values())
     assert min(observed) >= 1
-    assert max(observed) <= 4, "the trim or fill walk produced an implausible parent"
+    assert max(observed) <= 3, "the fill walk crossed the declared parent maximum"
+
+
+def test_relationship_adjustment_preserves_every_parent_bound() -> None:
+    assignment = assign_children(
+        factory(9),
+        site="transaction/account_id",
+        parent_count=50,
+        child_count=401,
+        counts=(8, 14, 20, 28),
+        weights=("0.30", "0.35", "0.25", "0.10"),
+    )
+    achieved = [assignment.count(parent) for parent in range(50)]
+    assert min(achieved) >= 8
+    assert max(achieved) <= 28
+    assert sum(achieved) == 401
+
+
+@pytest.mark.parametrize("children", [399, 1401])
+def test_infeasible_relationship_totals_are_rejected(children: int) -> None:
+    with pytest.raises(ValueError, match="feasible total"):
+        assign_children(
+            factory(),
+            site="transaction/account_id",
+            parent_count=50,
+            child_count=children,
+            counts=(8, 14, 20, 28),
+            weights=("0.30", "0.35", "0.25", "0.10"),
+        )
 
 
 def test_trimming_takes_from_the_highest_parents_first() -> None:
@@ -143,8 +172,8 @@ def test_trimming_takes_from_the_highest_parents_first() -> None:
     common = {
         "site": "account/customer_id",
         "parent_count": 50,
-        "counts": (2, 2, 2),
-        "weights": ("1", "1", "1"),
+        "counts": (1, 2),
+        "weights": ("1", "1"),
     }
     generous = assign_children(factory(), child_count=100, **common)  # type: ignore[arg-type]
     trimmed = assign_children(factory(), child_count=90, **common)  # type: ignore[arg-type]

@@ -362,3 +362,8 @@ being a record.
 - Denylist comparisons now use compatibility normalization and remove combining
   and default-ignorable characters, closing NFD, full-width, and zero-width
   obfuscation bypasses without changing emitted span offsets.
+- Relationship allocation now enforces declared per-parent bounds and rejects
+  infeasible recipe totals before generation.
+- `packcheck` now exhaustively scans lexicons, field literals and parameters,
+  and every bounded template branch for denylisted entities and checksum-valid
+  identifier literals; its mini-mints preserve relationship constraints.

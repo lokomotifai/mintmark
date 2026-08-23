@@ -6,10 +6,14 @@
   "identifier_policy": "safe",
   "digests": {
     "customer.jsonl": "f968b01fcef05728dd86393d827f43e81d92548ecbab5ac015382cb4f807d2d5",
-    "transaction.jsonl": "252a68a2f111db1dcd0b1a02ae0e2cb3698833b0da16b0ca5a926c5be1f00fe0",
+    "transaction.jsonl": "288a52c7066d78f63a7fcd493f35730dffd0567be3b4bdf625bef4529bd24747",
     "transaction.labels.jsonl": "87ab4ae3f02380f497fa9d48b0c2508bdbbeae679b8f5f6309234d6e6d939a9d"
   },
   "regenerated": [
+    {
+      "date": "2026-08-23",
+      "reason": "Relationship allocation now rejects infeasible recipe totals and preserves every parent's declared minimum and maximum while adjusting a feasible total. The previous truncation could leave parents without required children. Correcting the deterministic parent assignment changes transaction bytes and is recorded as part of the unreleased 0.3.0 security boundary."
+    },
     {
       "date": "2026-08-22",
       "reason": "The special-category descriptor lexicons were expanded from a handful of hard-coded strings to 90 curated entries, because every sector pack's evaluation recipe draws at least 300 spans per label and a four-entry pool would meet that count while producing a dataset that repeats itself. Expanding a lexicon changes the draw for every subsequent index, so emitted bytes moved for a fixed seed. That is a major version event under this project's own rule. It is recorded rather than quietly refreshed, and it is only harmless here because nothing has been published: no manifest exists that this breaks."

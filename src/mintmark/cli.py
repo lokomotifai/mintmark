@@ -31,7 +31,18 @@ from pathlib import Path
 from typing import Any
 
 from mintmark.annotate import Label, pin_digest
-from mintmark.identifiers import CHECKSUMMED
+from mintmark.engine.templates import (
+    Alternation,
+    EntitySlot,
+    FieldSlot,
+    IdentifierSlot,
+    LexiconSlot,
+    Literal,
+    Optional,
+    parse_template,
+)
+from mintmark.identifiers import ALL_ENGINES, CHECKSUMMED
+from mintmark.lexicons import load as load_denylist
 from mintmark.manifest import (
     MANIFEST_FILENAME,
     SUMS_FILENAME,
@@ -46,7 +57,8 @@ from mintmark.manifest.io import (
     DatasetIOError,
     DatasetReader,
 )
-from mintmark.mint import MintError, mint, packaged_pack_dir, resolve_pack, schema_dir
+from mintmark.manifest.safety import identifier_candidates, scalar_texts
+from mintmark.mint import MintError, asset_dir, mint, packaged_pack_dir, resolve_pack, schema_dir
 from mintmark.packs.loader import PackError
 from mintmark.packs.model import load_pack
 
@@ -433,17 +445,116 @@ def _locate_pack(directory: Path, name: str) -> Path | None:
     return None
 
 
+MAX_TEMPLATE_SAFETY_EXPANSIONS = 10_000
+
+
+def _literal_expansions(nodes: tuple[Any, ...]) -> tuple[str, ...]:
+    """Enumerate every literal grammar branch under a strict cross-product cap."""
+    outputs = [""]
+    for node in nodes:
+        variants: tuple[str, ...]
+        match node:
+            case Literal(text=text):
+                variants = (text,)
+            case FieldSlot() | EntitySlot() | IdentifierSlot() | LexiconSlot():
+                variants = (" ",)
+            case Alternation(branches=branches):
+                variants = tuple(
+                    rendering for branch in branches for rendering in _literal_expansions(branch)
+                )
+            case Optional(body=body):
+                variants = ("", *_literal_expansions(body))
+            case _:
+                raise AssertionError(f"unknown template node {node!r}")
+        if len(outputs) * len(variants) > MAX_TEMPLATE_SAFETY_EXPANSIONS:
+            raise ValueError(
+                f"template expands beyond {MAX_TEMPLATE_SAFETY_EXPANSIONS} safety branches"
+            )
+        outputs = [prefix + suffix for prefix in outputs for suffix in variants]
+    return tuple(outputs)
+
+
+def _pack_safety(pack_root: Path, loaded: Any) -> tuple[Any, list[str]]:
+    """Exhaustively inspect declaration-controlled emitted strings."""
+    core = load_denylist(asset_dir("denylist") / "institutions-tr.txt")
+    extension_path = pack_root / "lexicons" / "denylist_extension.txt"
+    matcher = load_denylist(extension_path) if extension_path.exists() else core
+    problems: list[str] = []
+    if not matcher.covers(core):
+        missing = sorted(matcher.missing_from(core))[:5]
+        problems.append(f"denylist extension omits core entries: {missing}")
+
+    surfaces: list[tuple[str, str]] = []
+    for name, values in loaded.lexicons.items():
+        surfaces.extend((f"lexicon {name}", value) for value in values)
+    for record_type in loaded.record_types:
+        for field in record_type.fields:
+            source = f"field {record_type.type_name}.{field.name}"
+            if field.generator_kind == "literal":
+                surfaces.append((source, field.generator_argument))
+            surfaces.extend((source, text) for text in scalar_texts(field.params))
+    for set_name, entries in loaded.template_sets.items():
+        for entry in entries:
+            nodes = parse_template(
+                entry.text,
+                template_id=entry.id,
+                known_labels=frozenset(label.value for label in Label),
+                known_identifiers=frozenset(ALL_ENGINES),
+                known_lexicons=frozenset(loaded.lexicons),
+            )
+            try:
+                renderings = _literal_expansions(nodes)
+            except ValueError as exc:
+                problems.append(f"template {set_name}/{entry.id}: {exc}")
+                continue
+            surfaces.extend((f"template {set_name}/{entry.id}", text) for text in renderings)
+
+    for source, surface in surfaces:
+        for hit in matcher.scan(surface):
+            problems.append(f"{source}: {hit.render()}")
+        for candidate in identifier_candidates(surface):
+            valid_as = [
+                name
+                for name, engine in CHECKSUMMED.items()
+                if engine.is_checksum_valid(candidate)
+            ]
+            if valid_as:
+                problems.append(
+                    f"{source}: checksum-valid {'/'.join(valid_as)} literal {candidate!r} "
+                    "is forbidden by safe policy"
+                )
+    return matcher, problems
+
+
+def _mini_record_counts(loaded: Any, recipe: Any) -> dict[str, int]:
+    """Shrink a valid recipe while retaining every relationship bound."""
+    selected = {name: min(25, count) for name, count in recipe.records.items()}
+    for record_type in loaded.record_types:
+        for field in record_type.fields:
+            if field.ref is None:
+                continue
+            parents = selected.get(field.ref.parent, 0)
+            low = parents * min(field.ref.counts)
+            high = parents * max(field.ref.counts)
+            selected[record_type.type_name] = min(
+                max(selected.get(record_type.type_name, 0), low), high
+            )
+    return selected
+
+
 def _cmd_packcheck(args: argparse.Namespace) -> int:
     pack_root = resolve_pack(args.pack)
     loaded = load_pack(pack_root)
 
     problems: list[str] = []
     warnings: list[str] = []
+    matcher, safety_problems = _pack_safety(pack_root, loaded)
+    problems.extend(safety_problems)
 
     with tempfile.TemporaryDirectory() as temporary:
         for recipe_name, recipe in sorted(loaded.recipes.items()):
             out = Path(temporary) / f"mini-{recipe_name}"
-            overrides = {name: min(25, count) for name, count in recipe.records.items()}
+            overrides = _mini_record_counts(loaded, recipe)
             try:
                 mint(
                     pack=pack_root,
@@ -467,12 +578,16 @@ def _cmd_packcheck(args: argparse.Namespace) -> int:
             problems.extend(f"recipe {recipe_name}: {p}" for p in report.problems)
 
             document = read_manifest(out)
+            for output in document["outputs"]:
+                output_path = out / output["path"]
+                for hit in matcher.scan(output_path.read_text(encoding="utf-8")):
+                    problems.append(f"recipe {recipe_name}: {output['path']}: {hit.render()}")
             for stat in document["stats"]["coverage_targets"]:
-                scaled = stat["target"] * 25
-                if stat["achieved"] * max(1, sum(recipe.records.values())) < scaled:
-                    warnings.append(
+                scaled_target = stat["target"] * max(1, sum(overrides.values()))
+                if stat["achieved"] * max(1, sum(recipe.records.values())) < scaled_target:
+                    problems.append(
                         f"recipe {recipe_name}: coverage target {stat['label']}="
-                        f"{stat['target']} may be infeasible at the declared counts"
+                        f"{stat['target']} is infeasible at the declared counts"
                     )
             shutil.rmtree(out, ignore_errors=True)
 
