@@ -11,6 +11,20 @@ output for a fixed set of inputs. A change that alters emitted bytes for a fixed
 seed is a major version event even when no signature changed, because it breaks
 the reproducibility of every published manifest.
 
+## 0.3.1 - 2026-08-23
+
+### Fixed
+
+- The manifest schema now uses the same 1,000,000-record per-type budget as pack
+  loading, minting, and streaming verification. The stale 50,000-record schema
+  ceiling made the published HR and banking reference shapes producible but
+  unverifiable.
+- A regression test exercises the legitimate upper boundary and confirms that
+  1,000,001 records remain rejected.
+
+Generated record and label files do not change for the same inputs. Manifests
+record the patch engine version.
+
 ## 0.3.0 - 2026-08-23
 
 ### Security
