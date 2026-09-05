@@ -24,7 +24,7 @@ jobs:
         with:
           enable-cache: true
           version: "0.12.3"
-      - run: uv sync --locked
+      - run: uv sync --locked --python 3.12
       - run: uv run ruff format --check .
       - run: uv run ruff check .
       - run: uv run mypy --strict src/
@@ -40,7 +40,7 @@ jobs:
         with:
           enable-cache: true
           version: "0.12.3"
-      - run: uv sync --locked
+      - run: uv sync --locked --python 3.12
       # The canary is never committed. It is supplied here as a repository
       # secret and the committed digest proves the right string was used.
       # A missing secret fails this job by design: a canary check that
@@ -64,7 +64,7 @@ jobs:
           echo "scan runs on the reviewed push to main." >> "$GITHUB_STEP_SUMMARY"
 
   tests:
-    name: tests on ${{ matrix.os }}
+    name: tests on ${{ matrix.os }}, CPython ${{ matrix.python }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -72,11 +72,15 @@ jobs:
         # The three platforms the determinism claim covers. Widening this
         # matrix widens the claim, so it changes only by an explicit decision.
         os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest]
+        # Every interpreter the package installs on runs the same suite, golden
+        # bytes included. The claim recorded in manifests still names CPython
+        # 3.12; the other minors are observed here, on the same three platforms.
+        python: ["3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
           enable-cache: true
           version: "0.12.3"
-      - run: uv sync --locked
+      - run: uv sync --locked --python ${{ matrix.python }}
       - run: uv run pytest -ra

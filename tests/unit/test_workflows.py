@@ -77,6 +77,28 @@ def test_required_ci_covers_the_three_supported_platforms() -> None:
     )
 
 
+def test_required_ci_runs_every_supported_interpreter() -> None:
+    """Every minor the package installs on runs the suite, golden bytes included."""
+    with (REPO_ROOT / "pyproject.toml").open("rb") as handle:
+        classifiers = tomllib.load(handle)["project"]["classifiers"]
+    declared = [
+        c.rsplit(" ", 1)[1]
+        for c in classifiers
+        if c.startswith("Programming Language :: Python :: 3.")
+    ]
+    assert declared, "pyproject declares no interpreter classifiers"
+
+    document = load(WORKFLOW_DIR / "ci.yml")
+    job = document["jobs"]["tests"]
+    assert job["strategy"]["matrix"]["python"] == declared, (
+        "the CI interpreter matrix and the pyproject classifiers must name the same minors"
+    )
+    assert "${{ matrix.python }}" in job["name"], "a job name must tell the interpreters apart"
+    assert any("--python ${{ matrix.python }}" in step.get("run", "") for step in job["steps"]), (
+        "the matrix interpreter must be the one uv syncs"
+    )
+
+
 def test_publication_stays_behind_a_recorded_authorization() -> None:
     """Publication is an authorization checkpoint, not a merge decision.
 

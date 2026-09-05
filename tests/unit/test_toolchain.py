@@ -11,14 +11,20 @@ import mintmark
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_runtime_is_cpython_312() -> None:
-    """The determinism claim covers CPython 3.12 only.
+SUPPORTED_MINORS = ((3, 12), (3, 13), (3, 14))
 
-    A test run on another minor version proves nothing about the claim, so the
-    suite refuses to run quietly on one.
+
+def test_runtime_is_a_supported_cpython() -> None:
+    """The suite runs only on an interpreter the project supports.
+
+    Every supported minor runs the same suite, golden bytes included, in
+    required CI. A run on any other version proves nothing about the claim, so
+    the suite refuses to run quietly on one.
     """
-    assert sys.version_info[:2] == (3, 12), (
-        f"expected CPython 3.12, running {sys.version.split()[0]}"
+    assert sys.implementation.name == "cpython", sys.implementation.name
+    assert sys.version_info[:2] in SUPPORTED_MINORS, (
+        f"expected CPython {' or '.join(f'{a}.{b}' for a, b in SUPPORTED_MINORS)}, "
+        f"running {sys.version.split()[0]}"
     )
 
 
@@ -40,9 +46,16 @@ def test_runtime_dependency_surface_stays_two_entries() -> None:
     )
 
 
-def test_requires_python_is_pinned_to_a_single_minor_version() -> None:
+def test_requires_python_matches_the_supported_minors() -> None:
+    """The metadata admits exactly the interpreters CI exercises, no more."""
     spec = _pyproject()["project"]["requires-python"]
-    assert spec == ">=3.12,<3.13", f"unexpected requires-python: {spec}"
+    low, high = SUPPORTED_MINORS[0], SUPPORTED_MINORS[-1]
+    assert spec == f">={low[0]}.{low[1]},<{high[0]}.{high[1] + 1}", spec
+    classifiers = _pyproject()["project"]["classifiers"]
+    assert isinstance(classifiers, list)
+    assert [c for c in classifiers if "Python :: 3." in c] == [
+        f"Programming Language :: Python :: {a}.{b}" for a, b in SUPPORTED_MINORS
+    ]
 
 
 def _pyproject() -> dict[str, object]:

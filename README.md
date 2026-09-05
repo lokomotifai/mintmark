@@ -13,15 +13,15 @@
 
 <p align="center">
   <a href="https://github.com/lokomotifai/mintmark/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/lokomotifai/mintmark/ci.yml?branch=main&amp;style=flat-square&amp;label=CI"></a>
-  <img alt="983 tests" src="https://img.shields.io/badge/tests-983-3C873A?style=flat-square">
+  <img alt="986 tests" src="https://img.shields.io/badge/tests-986-3C873A?style=flat-square">
   <img alt="18 invariants, each with a named test" src="https://img.shields.io/badge/invariants-18%20tested-3C873A?style=flat-square">
-  <a href="https://github.com/lokomotifai/mintmark/releases/tag/v0.3.3"><img alt="Release v0.3.3" src="https://img.shields.io/badge/release-v0.3.3-3C873A?style=flat-square"></a>
+  <a href="https://github.com/lokomotifai/mintmark/releases/tag/v0.3.4"><img alt="Release v0.3.4" src="https://img.shields.io/badge/release-v0.3.4-3C873A?style=flat-square"></a>
   <a href="https://pypi.org/project/mintmark/"><img alt="On PyPI" src="https://img.shields.io/pypi/v/mintmark?style=flat-square&amp;label=PyPI&amp;color=3C873A"></a>
   <a href="LICENSE"><img alt="Apache-2.0 license" src="https://img.shields.io/badge/license-Apache--2.0-3B3F46?style=flat-square"></a>
 </p>
 
 <p align="center">
-  <a href="https://www.python.org/"><img alt="Python 3.12" src="https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square"></a>
+  <a href="https://www.python.org/"><img alt="Python 3.12 to 3.14" src="https://img.shields.io/badge/Python-3.12%20to%203.14-3776AB?style=flat-square"></a>
   <img alt="Two runtime dependencies" src="https://img.shields.io/badge/runtime%20deps-2-17191F?style=flat-square">
   <img alt="No model in the generation path" src="https://img.shields.io/badge/models-none-D11F26?style=flat-square">
   <img alt="No network at mint time" src="https://img.shields.io/badge/network-none-D11F26?style=flat-square">
@@ -56,7 +56,7 @@ coin to say where it was made. A Mintmark dataset carries the same thing in its
 manifest, so a dataset that turns up six months later can still say what produced
 it.
 
-**Published as [`mintmark`](https://pypi.org/project/mintmark/) on PyPI.** 983
+**Published as [`mintmark`](https://pypi.org/project/mintmark/) on PyPI.** 986
 tests pass, all eighteen invariants have named tests, and the byte-level
 determinism claim is observed on three platforms in a single CI run rather than
 asserted from one.
@@ -92,11 +92,12 @@ what happens around that:
 ## Start in two minutes
 
 Offline after dependency bootstrap. No keys, no accounts, no network. The engine
-runs on CPython 3.12 only; `uv tool install` fetches that interpreter for you,
-while `pip` needs a 3.12 environment to install into.
+installs on CPython 3.12, 3.13, and 3.14, so the system Python on a current
+macOS or Linux is enough for `pip`; `uv tool install` fetches an interpreter if
+none is present. `mintmark --help` repeats these commands.
 
 ```bash
-uv tool install mintmark        # or, inside a Python 3.12 environment: pip install mintmark
+uv tool install mintmark        # or: pip install mintmark
 mintmark mint --pack example --recipe demo --seed 42 --out ./demo-run
 mintmark verify ./demo-run
 ```
@@ -167,6 +168,13 @@ carries a warning block that `verify` refuses to accept as missing.
 The manifest's `provenance` block, meaning the creation timestamp and the
 invocation line, is excluded. Everything else in the manifest is included.
 Windows is not claimed and is not tested.
+
+The engine also installs on CPython 3.13 and 3.14, and required CI runs the
+full suite, golden bytes included, on those interpreters on the same three
+platforms. Every manifest still records the claim as CPython 3.12 on three
+platforms, because `verify` holds that block to a fixed text and widening it
+would fail every dataset minted so far; the recorded claim widens with the
+next manifest schema revision.
 
 Every term is load-bearing, and the claim is narrow because keeping it is
 someone's job. What makes it hold:
