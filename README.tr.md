@@ -13,9 +13,9 @@
 
 <p align="center">
   <a href="https://github.com/lokomotifai/mintmark/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/lokomotifai/mintmark/ci.yml?branch=main&amp;style=flat-square&amp;label=CI"></a>
-  <img alt="926 test" src="https://img.shields.io/badge/test-926-3C873A?style=flat-square">
+  <img alt="983 test" src="https://img.shields.io/badge/test-983-3C873A?style=flat-square">
   <img alt="18 invariant, her biri adlandırılmış testle" src="https://img.shields.io/badge/invariant-18%20test%20edildi-3C873A?style=flat-square">
-  <a href="https://github.com/lokomotifai/mintmark/releases/tag/v0.3.2"><img alt="Sürüm v0.3.2" src="https://img.shields.io/badge/sürüm-v0.3.2-3C873A?style=flat-square"></a>
+  <a href="https://github.com/lokomotifai/mintmark/releases/tag/v0.3.3"><img alt="Sürüm v0.3.3" src="https://img.shields.io/badge/sürüm-v0.3.2-3C873A?style=flat-square"></a>
   <a href="https://pypi.org/project/mintmark/"><img alt="PyPI'de" src="https://img.shields.io/pypi/v/mintmark?style=flat-square&amp;label=PyPI&amp;color=3C873A"></a>
   <a href="LICENSE"><img alt="Apache-2.0 lisansı" src="https://img.shields.io/badge/lisans-Apache--2.0-3B3F46?style=flat-square"></a>
 </p>
@@ -57,7 +57,7 @@ basıldığını söylemek için vurduğu küçük harftir. Bir Mintmark veri k�
 kendisini neyin ürettiğini hâlâ söyleyebilir.
 
 **PyPI'de [`mintmark`](https://pypi.org/project/mintmark/) olarak
-yayımlanmıştır.** 890 test geçiyor, on sekiz invariant'ın hepsinin adlandırılmış
+yayımlanmıştır.** 983 test geçiyor, on sekiz invariant'ın hepsinin adlandırılmış
 testi var ve bayt düzeyindeki determinizm iddiası tek bir platformdan varsayılmak
 yerine tek bir CI koşusunda üç platformda gözlemleniyor.
 
@@ -85,16 +85,18 @@ etrafında olup bitenle ilgilenir:
 | Bu tanımlayıcı gerçek bir kişiye ait olabilir mi? | Hayır. Safe mod kanıtlanabilir şekilde checksum geçersiz değerler üretir ve `verify` bunu ispatlamak için bir tüketicinin uygulayacağı doğrulayıcının aynısını çalıştırır. |
 | Gelecek ay aynı veriyi alır mıyım? | Evet, bayt bayt; aynı motor sürümü, paket özeti, tarif, tohum, politika ve biçimle. |
 | Bu dosya dizinini ne üretti? | `MINTMARK.json`; motoru, paket özetini, tarifi, tohumu, politikayı, taksonomi pinini ve her sağlama toplamını birbirine bağlar. |
-| Etiketlerin hizalı olduğunu nereden bilirim? | Her span, yüzeyi yerleştirilirken kaydedilir ve `verify` her birini indekslediği metinden yeniden çıkarır. |
+| Etiketlerin hizalı olduğunu nereden bilirim? | Her span, yüzeyi yerleştirilirken kaydedilir. `verify` her birini indekslediği metinden yeniden dilimler; sınırları, örtüşmeyi ve etiketi denetler ve bir kimlik span'inin etiketinin adlandırdığı kimlik gibi okunmasını şart koşar. |
 | Bunların hiçbirini size güvenmeden denetleyebilir miyim? | Evet. `mintmark reproduce` yalnızca manifestodan yeniden basar ve baytları karşılaştırır. |
 | Veri fiilen ne içeriyordu? | Manifesto, ulaşılan dağılımları ve etiket kapsamını hedeflerin yanına, tutturulmuş olsun olmasın kaydeder. |
 
 ## İki dakikada başlayın
 
-Bağımlılık kurulumundan sonra çevrimdışı. Anahtar yok, hesap yok, ağ yok.
+Bağımlılık kurulumundan sonra çevrimdışı. Anahtar yok, hesap yok, ağ yok. Motor
+yalnızca CPython 3.12 üzerinde çalışır; `uv tool install` o yorumlayıcıyı sizin
+için indirir, `pip` ise kurulum yapacağı bir 3.12 ortamına ihtiyaç duyar.
 
 ```bash
-uv tool install mintmark        # veya: pip install mintmark
+uv tool install mintmark        # veya, bir Python 3.12 ortamının içinde: pip install mintmark
 mintmark mint --pack example --recipe demo --seed 42 --out ./demo-run
 mintmark verify ./demo-run
 ```
@@ -249,7 +251,7 @@ src/mintmark/
   emit/           kanonik JSONL ve CSV, atomik çıktı
   manifest/       MINTMARK.json, sağlama toplamları, verify
   lexicons/       Türkçe temel sözlükler ve kurum denylist'i
-  mint.py         katmanların buluştuğu kompozisyon kökü
+  minting.py      katmanların buluştuğu kompozisyon kökü
   cli.py          yedi komut, beş çıkış kodu, kararlı JSON yükleri
 schemas/          paket ve manifesto JSON Şemaları, sürümlenmiş
 packs/example/    hızlı başlangıcın kullandığı örnek paket
@@ -296,7 +298,9 @@ grameri, çıkış kodları, `--json` yükleri, kütüphanenin iki fonksiyonu, i
 
 Sonuncusu vurgulanmayı hak eder. **Sabit bir tohum için üretilen baytları
 değiştiren bir değişiklik, hiçbir imza kımıldamasa bile ana sürüm olayıdır**,
-çünkü yayımlanmış her manifestonun yeniden üretilebilirliğini bozar.
+çünkü yayımlanmış her manifestonun yeniden üretilebilirliğini bozar. Ana sürüm
+sıfırken bu olayı 0.3.0'da olduğu gibi ikincil sürüm taşır; bir yama sürümü
+baytları asla oynatmaz.
 
 PyPI'de [`mintmark`](https://pypi.org/project/mintmark/) olarak yayımlandı ve
 GitHub'da wheel, kaynak dağıtımı ve bir yazılım malzeme listesiyle sürüldü.

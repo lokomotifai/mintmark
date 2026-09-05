@@ -23,7 +23,7 @@ include_external_packages = True
 name = Module layers follow the declared dependency direction
 type = layers
 layers =
-    (cli) : (mint) : (api)
+    (cli) : (minting) : (api)
     (manifest)
     (emit)
     (annotate) : (identifiers) : (packs)

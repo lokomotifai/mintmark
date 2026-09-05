@@ -64,3 +64,17 @@ def is_checksum_valid(value: str) -> bool:
     if len(value) != LENGTH or not value.isdigit():
         return False
     return int(value[15]) == _luhn_check_digit(value[:15])
+
+
+def is_well_formed(value: str) -> bool:
+    """Return True when `value` is a full sixteen-digit PAN or its masked form."""
+    if len(value) != LENGTH:
+        return False
+    if value.isdigit():
+        return True
+    prefix, hidden, suffix = (
+        value[:_MASK_PREFIX],
+        value[_MASK_PREFIX : LENGTH - _MASK_SUFFIX],
+        value[LENGTH - _MASK_SUFFIX :],
+    )
+    return prefix.isdigit() and suffix.isdigit() and hidden == "*" * len(hidden)

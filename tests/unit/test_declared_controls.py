@@ -23,7 +23,7 @@ from mintmark.engine.prng import SplitMix64
 from mintmark.engine.streams import StreamFactory
 from mintmark.identifiers import IdentifierPolicy
 from mintmark.manifest import MANIFEST_FILENAME, read_manifest
-from mintmark.mint import ENGINE_MAJOR, MintError, _MintContext, mint
+from mintmark.minting import ENGINE_MAJOR, MintError, _MintContext, mint
 from mintmark.packs.loader import PackError
 from mintmark.packs.model import load_pack
 
@@ -183,7 +183,7 @@ def test_template_weights_decide_the_draw(tmp_path: Path):
 def test_generation_weights_are_scaled_once_per_declaration(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ):
-    import mintmark.mint as mint_module
+    import mintmark.minting as mint_module
 
     calls = 0
     original = mint_module.scale_weights

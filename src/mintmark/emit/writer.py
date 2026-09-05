@@ -14,10 +14,13 @@ from __future__ import annotations
 
 import os
 import shutil
+import signal
 import tempfile
+import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from types import FrameType
 from typing import TextIO
 
 
@@ -89,11 +92,44 @@ class StagedOutput:
 
 
 @contextmanager
+def _termination_raises() -> Iterator[None]:
+    """Turn SIGTERM into an exception for the duration of a mint.
+
+    Python's default SIGTERM disposition ends the process at once, before any
+    `finally` clause runs, which is the one way a staging directory outlives
+    the mint that made it. Raising instead lets the cleanup below run, and the
+    process still exits with 128 + 15 the way a terminated process does.
+
+    The handler is installed only from the main thread, and only when nobody
+    else has installed one: a host application that handles SIGTERM itself
+    keeps its own arrangement.
+    """
+    if threading.current_thread() is not threading.main_thread():
+        yield
+        return
+    previous = signal.getsignal(signal.SIGTERM)
+    if previous is not signal.SIG_DFL:
+        yield
+        return
+
+    def raise_on_terminate(signum: int, frame: FrameType | None) -> None:
+        del frame
+        raise SystemExit(128 + signum)
+
+    signal.signal(signal.SIGTERM, raise_on_terminate)
+    try:
+        yield
+    finally:
+        signal.signal(signal.SIGTERM, previous)
+
+
+@contextmanager
 def staged_output(target: Path) -> Iterator[StagedOutput]:
     """Build an output directory, publishing it only on success.
 
-    Any exception, including a keyboard interrupt, removes the staging directory
-    on the way out. What a consumer sees is either a complete mint or nothing.
+    Any exception, including a keyboard interrupt or a SIGTERM turned into one,
+    removes the staging directory on the way out. What a consumer sees is
+    either a complete mint or nothing.
     """
     target = Path(target)
     if target.exists() or target.is_symlink():
@@ -101,12 +137,13 @@ def staged_output(target: Path) -> Iterator[StagedOutput]:
             f"{target} already exists. A mint never overwrites an existing output directory: "
             "the old one may be a published dataset."
         )
-    staged = StagedOutput(target)
-    try:
-        yield staged
-        if not staged._committed:
-            staged.commit()
-    finally:
-        if not staged._committed:
-            staged.discard()
-        staged.close()
+    with _termination_raises():
+        staged = StagedOutput(target)
+        try:
+            yield staged
+            if not staged._committed:
+                staged.commit()
+        finally:
+            if not staged._committed:
+                staged.discard()
+            staged.close()

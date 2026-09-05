@@ -348,3 +348,173 @@ def test_csv_format_produces_csv_files(tmp_path: Path) -> None:
     assert (out / "customer.csv").exists()
     header = (out / "customer.csv").read_text(encoding="utf-8").splitlines()[0]
     assert header.startswith("customer_id,first_name,last_name")
+
+
+# The cases below close defects found by an end-to-end run against 0.3.2: usage
+# errors that argparse reported with the pack-error code, operating-system
+# errors that reached the user as tracebacks, and --json verbs that fell silent
+# on their error path.
+
+
+def test_a_usage_error_from_argparse_exits_one_not_two(capsys) -> None:
+    """Two belongs to a malformed pack. argparse's own convention does not apply."""
+    with pytest.raises(SystemExit) as caught:
+        main(["mint", "--pack", PACK, "--recipe", "demo", "--seed", "abc", "--out", "x"])
+    assert caught.value.code == EXIT_USAGE
+    assert "invalid int value" in capsys.readouterr().err
+
+
+def test_an_unknown_verb_exits_one(capsys) -> None:
+    with pytest.raises(SystemExit) as caught:
+        main(["frobnicate"])
+    assert caught.value.code == EXIT_USAGE
+    assert "invalid choice" in capsys.readouterr().err
+
+
+def test_an_existing_output_directory_is_refused_without_a_traceback(
+    tmp_path: Path, capsys
+) -> None:
+    out = tmp_path / "run"
+    assert mint_to(out) == EXIT_OK
+    capsys.readouterr()
+    assert mint_to(out) == EXIT_USAGE
+    captured = capsys.readouterr()
+    assert "never overwrites" in captured.err
+    assert "Traceback" not in captured.err
+
+
+def test_an_output_path_that_is_a_file_is_refused_cleanly(tmp_path: Path, capsys) -> None:
+    out = tmp_path / "afile"
+    out.write_text("x", encoding="utf-8")
+    assert mint_to(out) == EXIT_USAGE
+    assert "Traceback" not in capsys.readouterr().err
+
+
+def test_a_parent_that_is_a_file_is_refused_cleanly(tmp_path: Path, capsys) -> None:
+    parent = tmp_path / "afile"
+    parent.write_text("x", encoding="utf-8")
+    assert mint_to(parent / "run") == EXIT_USAGE
+    assert "Traceback" not in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("verb", ["packcheck", "inspect"])
+def test_json_verbs_report_a_bad_pack_as_json(verb: str, tmp_path: Path, capsys) -> None:
+    """A caller parsing stdout must find the failure there, not only on stderr."""
+    code = main([verb, str(tmp_path / "nope"), "--json"])
+    assert code == EXIT_INVALID_PACK
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["ok"] is False
+    assert payload["problems"]
+    assert "pack" in payload["problems"][0]
+
+
+def test_mint_json_reports_a_usage_error_as_json(tmp_path: Path, capsys) -> None:
+    code = main(
+        [
+            "mint",
+            "--pack",
+            PACK,
+            "--recipe",
+            "nonexistent",
+            "--seed",
+            "1",
+            "--out",
+            str(tmp_path / "r"),
+            "--json",
+        ]
+    )
+    assert code == EXIT_USAGE
+    payload = json.loads(capsys.readouterr().out)
+    assert payload == {"ok": False, "problems": payload["problems"]}
+    assert "nonexistent" in payload["problems"][0]
+
+
+def _pack_with_a_broken_template(tmp_path: Path) -> Path:
+    import shutil
+
+    pack = tmp_path / "pack"
+    shutil.copytree(PACK, pack)
+    template = pack / "templates" / "txn_descriptions" / "set.yaml"
+    text = template.read_text(encoding="utf-8")
+    template.write_text(text.replace("{entity:PERSON}", "{{entity:PERSON}", 1), encoding="utf-8")
+    return pack
+
+
+def test_a_malformed_template_is_an_invalid_pack_for_mint(tmp_path: Path, capsys) -> None:
+    pack = _pack_with_a_broken_template(tmp_path)
+    code = main(
+        [
+            "mint",
+            "--pack",
+            str(pack),
+            "--recipe",
+            "demo",
+            "--seed",
+            "1",
+            "--out",
+            str(tmp_path / "r"),
+        ]
+    )
+    assert code == EXIT_INVALID_PACK
+    assert "unbalanced-brace" in capsys.readouterr().err
+
+
+def test_a_malformed_template_is_an_invalid_pack_for_packcheck(tmp_path: Path, capsys) -> None:
+    pack = _pack_with_a_broken_template(tmp_path)
+    assert main(["packcheck", str(pack)]) == EXIT_INVALID_PACK
+    assert "unbalanced-brace" in capsys.readouterr().err
+
+
+def test_reproduce_names_every_place_it_looked_for_the_pack(
+    tmp_path: Path, capsys, monkeypatch
+) -> None:
+    out = tmp_path / "run"
+    assert mint_to(out) == EXIT_OK
+    manifest = out / "MINTMARK.json"
+    document = json.loads(manifest.read_text(encoding="utf-8"))
+    # Point the manifest at a pack nobody has, keeping every digest consistent.
+    document["pack"]["name"] = "mintmark-nowhere"
+    document["license"]["attribution"] = document["license"]["attribution"].replace(
+        "mintmark-example", "mintmark-nowhere"
+    )
+    manifest.write_text(json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    from mintmark.manifest import MANIFEST_FILENAME, SUMS_FILENAME, file_digest, render_sums
+
+    sums = {o["path"]: o["sha256"] for o in document["outputs"]}
+    sums[MANIFEST_FILENAME] = file_digest(manifest)
+    (out / SUMS_FILENAME).write_text(render_sums(sums), encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    capsys.readouterr()
+    code = main(["reproduce", str(out)])
+    err = capsys.readouterr().err
+    assert code == EXIT_USAGE
+    assert "Searched:" in err
+    assert str(tmp_path / "mintmark-nowhere") in err
+
+
+def test_verify_says_not_checked_when_it_never_reached_the_files(tmp_path: Path, capsys) -> None:
+    """A run that stops at a missing directory must not print zeros that read like results."""
+    assert main(["verify", str(tmp_path / "nope")]) == EXIT_VERIFY_FAILED
+    out = capsys.readouterr().out
+    assert "checksums: not checked" in out
+    assert "coverage targets: not checked\n" in out
+    assert "overrode" not in out
+    assert "label alignment: not checked" in out
+    assert "taxonomy: unknown" in out
+
+
+def test_python_dash_m_reaches_the_same_entry_point() -> None:
+    import subprocess
+    import sys
+
+    result = subprocess.run(
+        [sys.executable, "-m", "mintmark", "--version"],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=REPO_ROOT,
+    )
+    from mintmark import __version__
+
+    assert result.returncode == 0
+    assert __version__ in result.stdout

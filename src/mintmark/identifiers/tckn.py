@@ -59,3 +59,12 @@ def is_checksum_valid(value: str) -> bool:
         return False
     d10, d11 = _check_digits(value[:9])
     return value[9] == str(d10) and value[10] == str(d11)
+
+
+def is_well_formed(value: str) -> bool:
+    """Return True when `value` has the shape of a TCKN: eleven digits, first nonzero.
+
+    Shape, not validity. `verify` applies this to every span labeled TCKN so that
+    a sidecar whose offsets drifted cannot keep the label on a fragment.
+    """
+    return len(value) == LENGTH and value.isdigit() and value[0] != "0"

@@ -18,7 +18,8 @@ A pull request with an unsigned commit is not merged until it is signed.
 ## Before you open a pull request
 
 Run the same checks required CI runs. All of them work offline once dependencies
-are installed.
+are installed. `pyproject.toml` accepts any uv in the 0.12 series; required CI
+runs 0.12.3.
 
     uv sync
     uv run ruff format --check .

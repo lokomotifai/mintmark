@@ -192,3 +192,27 @@ def test_core_range_membership(text: str, version: str, expected: bool) -> None:
 def test_malformed_core_ranges_are_refused(bad: str) -> None:
     with pytest.raises(ValueError, match=r"closed upper bound|empty range"):
         parse_range(bad)
+
+
+@pytest.mark.adversarial
+def test_a_schema_error_over_a_huge_instance_is_bounded(tmp_path: Path) -> None:
+    """jsonschema echoes the offending instance; half a megabyte of it helps nobody."""
+    from mintmark.packs.model import MAX_SCHEMA_DETAIL_CHARS
+
+    pack = tmp_path / "pack"
+    shutil.copytree(FIXTURES.parents[2] / "packs" / "example", pack)
+    fields = pack / "fields" / "customer.yaml"
+    extra = "".join(
+        f"\n  - name: f{i}_extra\n    type: int\n    generator: int_uniform\n"
+        f"    params:\n      min: 0\n      max: 9\n    pii_label: none"
+        for i in range(5000)
+    )
+    fields.write_text(
+        fields.read_text(encoding="utf-8").rstrip("\n") + extra + "\n", encoding="utf-8"
+    )
+    with pytest.raises(PackError) as caught:
+        load_pack(pack)
+    assert caught.value.rule == "schema"
+    assert len(caught.value.detail) < MAX_SCHEMA_DETAIL_CHARS + 120
+    assert caught.value.detail.startswith("maxItems:")
+    assert "more characters omitted" in caught.value.detail

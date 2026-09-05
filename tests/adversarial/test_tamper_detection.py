@@ -556,3 +556,65 @@ def test_reproduce_refuses_an_altered_sums_file(dataset: Path) -> None:
 def test_reproduce_refuses_an_unlisted_extra_file(dataset: Path) -> None:
     (dataset / "extra.jsonl").write_text("{}\n", encoding="utf-8")
     assert main(["reproduce", str(dataset)]) == EXIT_REPRODUCE_MISMATCH
+
+
+# A consistent rewrite: every digest updated to match the edit. Checksums then
+# prove nothing, and only the semantic checks stand between the edit and a
+# clean report. These two were found passing against 0.3.2.
+
+
+def _first_span_line(sidecar: Path) -> tuple[int, dict]:  # type: ignore[type-arg]
+    lines = sidecar.read_text(encoding="utf-8").split("\n")
+    for index, line in enumerate(lines):
+        if line and json.loads(line)["spans"]:
+            return index, json.loads(line)
+    raise AssertionError("no span to tamper with")
+
+
+def _rewrite_line(sidecar: Path, index: int, record: dict) -> None:  # type: ignore[type-arg]
+    lines = sidecar.read_text(encoding="utf-8").split("\n")
+    lines[index] = json.dumps(record, ensure_ascii=False, separators=(",", ":"))
+    sidecar.write_text("\n".join(lines), encoding="utf-8")
+
+
+@pytest.mark.adversarial
+def test_a_shifted_span_offset_is_caught_even_with_every_digest_resealed(
+    dataset: Path, capsys
+) -> None:
+    sidecar = dataset / "transaction.labels.jsonl"
+    index, record = _first_span_line(sidecar)
+    record["spans"][0]["start"] += 1
+    _rewrite_line(sidecar, index, record)
+    reseal_output(dataset, "transaction.labels.jsonl")
+    assert main(["verify", str(dataset)]) == EXIT_VERIFY_FAILED
+    assert "does not match the IBAN shape" in capsys.readouterr().out
+
+
+@pytest.mark.adversarial
+def test_a_relabeled_identifier_span_is_caught_even_with_coverage_resealed(
+    dataset: Path, capsys
+) -> None:
+    """Swap an identifier label for an entity label and fix the coverage counts too."""
+    sidecar = dataset / "transaction.labels.jsonl"
+    lines = sidecar.read_text(encoding="utf-8").split("\n")
+    for index, line in enumerate(lines):
+        if not line:
+            continue
+        record = json.loads(line)
+        identifier_spans = [span for span in record["spans"] if span["label"] == "IBAN"]
+        if identifier_spans:
+            identifier_spans[0]["label"] = "PERSON"
+            _rewrite_line(sidecar, index, record)
+            break
+    else:
+        raise AssertionError("no IBAN span in the fixture")
+    manifest_path = dataset / MANIFEST_FILENAME
+    document = json.loads(manifest_path.read_text(encoding="utf-8"))
+    document["entity_coverage"]["IBAN"] -= 1
+    document["entity_coverage"]["PERSON"] += 1
+    manifest_path.write_text(
+        json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    reseal_output(dataset, "transaction.labels.jsonl")
+    assert main(["verify", str(dataset)]) == EXIT_VERIFY_FAILED
+    assert "has the shape of IBAN but is labeled PERSON" in capsys.readouterr().out

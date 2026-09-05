@@ -199,7 +199,25 @@ def _validate(path: Path, document: dict[str, Any], definition: str | None = Non
     )
     if first is not None:
         location = "/".join(str(part) for part in first.absolute_path) or "document"
-        raise PackError(path, location, "schema", first.message)
+        raise PackError(path, location, "schema", _schema_detail(first))
+
+
+# jsonschema echoes the offending instance into its message. For a scalar that
+# is the useful part; for a five-thousand-entry list it is half a megabyte of
+# stderr with the rule at the very end. The rule and the location are what a
+# pack author acts on, so the echo is bounded and the rule is named first.
+MAX_SCHEMA_DETAIL_CHARS = 240
+
+
+def _schema_detail(error: jsonschema.ValidationError) -> str:
+    message = error.message
+    if len(message) <= MAX_SCHEMA_DETAIL_CHARS:
+        return message
+    omitted = len(message) - MAX_SCHEMA_DETAIL_CHARS
+    return (
+        f"{error.validator}: {message[:MAX_SCHEMA_DETAIL_CHARS]} "
+        f"[{omitted} more characters omitted]"
+    )
 
 
 def record_count_problem(counts: Mapping[str, object]) -> tuple[str, str] | None:

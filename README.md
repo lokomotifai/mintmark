@@ -13,9 +13,9 @@
 
 <p align="center">
   <a href="https://github.com/lokomotifai/mintmark/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/lokomotifai/mintmark/ci.yml?branch=main&amp;style=flat-square&amp;label=CI"></a>
-  <img alt="926 tests" src="https://img.shields.io/badge/tests-926-3C873A?style=flat-square">
+  <img alt="983 tests" src="https://img.shields.io/badge/tests-983-3C873A?style=flat-square">
   <img alt="18 invariants, each with a named test" src="https://img.shields.io/badge/invariants-18%20tested-3C873A?style=flat-square">
-  <a href="https://github.com/lokomotifai/mintmark/releases/tag/v0.3.2"><img alt="Release v0.3.2" src="https://img.shields.io/badge/release-v0.3.2-3C873A?style=flat-square"></a>
+  <a href="https://github.com/lokomotifai/mintmark/releases/tag/v0.3.3"><img alt="Release v0.3.3" src="https://img.shields.io/badge/release-v0.3.3-3C873A?style=flat-square"></a>
   <a href="https://pypi.org/project/mintmark/"><img alt="On PyPI" src="https://img.shields.io/pypi/v/mintmark?style=flat-square&amp;label=PyPI&amp;color=3C873A"></a>
   <a href="LICENSE"><img alt="Apache-2.0 license" src="https://img.shields.io/badge/license-Apache--2.0-3B3F46?style=flat-square"></a>
 </p>
@@ -56,7 +56,7 @@ coin to say where it was made. A Mintmark dataset carries the same thing in its
 manifest, so a dataset that turns up six months later can still say what produced
 it.
 
-**Published as [`mintmark`](https://pypi.org/project/mintmark/) on PyPI.** 890
+**Published as [`mintmark`](https://pypi.org/project/mintmark/) on PyPI.** 983
 tests pass, all eighteen invariants have named tests, and the byte-level
 determinism claim is observed on three platforms in a single CI run rather than
 asserted from one.
@@ -85,16 +85,18 @@ what happens around that:
 | Can this identifier belong to a real person? | No. Safe mode emits provably checksum-invalid values, and `verify` runs the same validator a consumer would to prove it. |
 | Will I get the same data next month? | Yes, byte for byte, from the same engine version, pack digest, recipe, seed, policy, and format. |
 | What produced this directory of files? | `MINTMARK.json`, which binds the engine, the pack digest, the recipe, the seed, the policy, the taxonomy pin, and every checksum. |
-| How do I know the labels line up? | Every span is recorded as its surface is placed, and `verify` re-extracts every one from the text it indexes. |
+| How do I know the labels line up? | Every span is recorded as its surface is placed. `verify` re-slices every one from the text it indexes, checks bounds, overlap and label, and requires an identifier span to read like the identifier its label names. |
 | Can I check any of this without trusting you? | Yes. `mintmark reproduce` re-mints from the manifest alone and compares bytes. |
 | What did the data actually contain? | The manifest records achieved distributions and label coverage next to the targets, whether or not they were met. |
 
 ## Start in two minutes
 
-Offline after dependency bootstrap. No keys, no accounts, no network.
+Offline after dependency bootstrap. No keys, no accounts, no network. The engine
+runs on CPython 3.12 only; `uv tool install` fetches that interpreter for you,
+while `pip` needs a 3.12 environment to install into.
 
 ```bash
-uv tool install mintmark        # or: pip install mintmark
+uv tool install mintmark        # or, inside a Python 3.12 environment: pip install mintmark
 mintmark mint --pack example --recipe demo --seed 42 --out ./demo-run
 mintmark verify ./demo-run
 ```
@@ -247,7 +249,7 @@ src/mintmark/
   emit/           canonical JSONL and CSV, atomic output
   manifest/       MINTMARK.json, checksums, verify
   lexicons/       Turkish base lexicons and the institution denylist
-  mint.py         the composition root, where the layers meet
+  minting.py      the composition root, where the layers meet
   cli.py          seven verbs, five exit codes, stable JSON payloads
 schemas/          pack and manifest JSON Schemas, versioned
 packs/example/    the fixture pack the quickstart uses
@@ -294,7 +296,9 @@ functions, both JSON Schemas, and the bytes a fixed seed produces.
 
 That last one deserves emphasis. **A change that alters emitted bytes for a fixed
 seed is a major version event even when no signature moved**, because it breaks
-the reproducibility of every published manifest.
+the reproducibility of every published manifest. While the major version is
+zero, that event is carried by the minor version, as 0.3.0 did; a patch release
+never moves bytes.
 
 Published on PyPI as [`mintmark`](https://pypi.org/project/mintmark/), and
 released on GitHub with the wheel, the source distribution, and a software bill

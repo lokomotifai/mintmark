@@ -17,7 +17,7 @@ import pytest
 
 from mintmark.annotate import ALL_LABELS
 from mintmark.lexicons import load as load_denylist
-from mintmark.mint import asset_dir, mint
+from mintmark.minting import asset_dir, mint
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PACK = REPO_ROOT / "packs" / "example"
@@ -330,7 +330,7 @@ def test_safe_mint_rejects_checksum_valid_content_from_a_pack_lexicon(tmp_path: 
 
     from mintmark.engine.prng import SplitMix64
     from mintmark.identifiers import IdentifierPolicy, vkn
-    from mintmark.mint import MintError
+    from mintmark.minting import MintError
 
     pack = tmp_path / "pack"
     shutil.copytree(PACK, pack)
@@ -361,7 +361,7 @@ def test_safe_mint_rejects_checksum_valid_literal_in_document_template(tmp_path:
 
     from mintmark.engine.prng import SplitMix64
     from mintmark.identifiers import IdentifierPolicy, iban
-    from mintmark.mint import MintError
+    from mintmark.minting import MintError
 
     pack = tmp_path / "pack"
     shutil.copytree(PACK, pack)

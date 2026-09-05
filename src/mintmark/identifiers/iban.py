@@ -91,3 +91,16 @@ def is_checksum_valid(value: str) -> bool:
     if not _CHECK_LOW <= int(check) <= _CHECK_HIGH:
         return False
     return _numeric_form(COUNTRY, check, compact[4:]) % 97 == 1
+
+
+def is_well_formed(value: str) -> bool:
+    """Return True when `value` has the shape of a TR IBAN, plain or grouped.
+
+    Shape only: the check digits are not examined, because both a safe-mode
+    value and a validator-mode value must pass this while only one of them
+    passes `is_checksum_valid`.
+    """
+    compact = value.replace(" ", "")
+    if value != compact and value != group(compact):
+        return False
+    return len(compact) == LENGTH and compact.startswith(COUNTRY) and compact[2:].isdigit()

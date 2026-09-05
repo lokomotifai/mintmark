@@ -18,7 +18,8 @@ satırı taşır:
 ## Çekme isteği açmadan önce
 
 Zorunlu CI'ın çalıştırdığı kontrollerin aynısını çalıştırın. Bağımlılıklar
-kurulduktan sonra hepsi çevrimdışı çalışır.
+kurulduktan sonra hepsi çevrimdışı çalışır. `pyproject.toml` 0.12 serisindeki
+her uv'yi kabul eder; zorunlu CI 0.12.3 çalıştırır.
 
     uv sync
     uv run ruff format --check .

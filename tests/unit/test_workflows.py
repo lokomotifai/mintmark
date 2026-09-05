@@ -137,13 +137,28 @@ def test_every_external_action_is_pinned_to_an_immutable_commit(path: Path) -> N
 
 
 def test_uv_and_the_build_backend_are_exactly_locked() -> None:
+    """The build backend is pinned exactly; uv is pinned exactly where it builds.
+
+    Wheel bytes come from hatchling, so hatchling is locked to one version in
+    both the build system and the dev group. uv resolves rather than builds, so
+    a contributor's uv only has to sit in the series the lockfile was written
+    with, while every workflow installs one exact release of that series.
+    """
     with (REPO_ROOT / "pyproject.toml").open("rb") as handle:
         project = tomllib.load(handle)
     assert project["build-system"]["requires"] == ["hatchling==1.31.0"]
     assert "hatchling==1.31.0" in project["dependency-groups"]["dev"]
-    assert project["tool"]["uv"]["required-version"] == "==0.12.3"
+    assert project["tool"]["uv"]["required-version"] == ">=0.12.3,<0.13"
     lock = (REPO_ROOT / "uv.lock").read_text(encoding="utf-8")
     assert 'name = "hatchling"\nversion = "1.31.0"' in lock
+    pinned = {
+        step["with"]["version"]
+        for path in WORKFLOWS
+        for job in load(path)["jobs"].values()
+        for step in job["steps"]
+        if "astral-sh/setup-uv" in step.get("uses", "")
+    }
+    assert pinned == {"0.12.3"}, pinned
 
 
 def test_pull_request_code_never_receives_the_private_canary() -> None:
