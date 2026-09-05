@@ -518,3 +518,57 @@ def test_python_dash_m_reaches_the_same_entry_point() -> None:
 
     assert result.returncode == 0
     assert __version__ in result.stdout
+
+
+def test_help_explains_every_mint_option_and_where_to_start(capsys) -> None:
+    """Somebody who skips the README and reaches for --help must still be able to start."""
+    from mintmark.cli import build_parser
+
+    parser = build_parser()
+    with pytest.raises(SystemExit) as caught:
+        parser.parse_args(["--help"])
+    assert caught.value.code == 0
+    top = capsys.readouterr().out
+    assert "start here:" in top
+    assert "mintmark mint --pack example --recipe demo --seed 42 --out ./demo-run" in top
+
+    with pytest.raises(SystemExit):
+        parser.parse_args(["mint", "--help"])
+    mint_help = " ".join(capsys.readouterr().out.split())  # argparse wraps at its own width
+    for option in ("--pack", "--recipe", "--seed", "--out", "--records", "--format", "--json"):
+        assert option in mint_help
+    assert "`example`" in mint_help, "the shipped pack must be discoverable from --help"
+    assert "mintmark inspect" in mint_help, "recipes must be discoverable from --help"
+    assert "must not exist yet" in mint_help
+
+    for verb in ("verify", "reproduce", "packcheck", "inspect", "schema"):
+        with pytest.raises(SystemExit):
+            parser.parse_args([verb, "--help"])
+        assert "positional arguments:" in capsys.readouterr().out
+
+
+def test_every_help_example_actually_runs(tmp_path: Path, monkeypatch) -> None:
+    """An example in --help that fails is worse than no example."""
+    import shlex
+
+    from mintmark.cli import MINT_EXAMPLES, START_HERE
+
+    monkeypatch.chdir(tmp_path)
+    examples: list[str] = []
+    for text in (START_HERE, MINT_EXAMPLES):
+        joined = text.replace("\\\n", " ")  # a continuation line is one command
+        examples.extend(
+            " ".join(line.split())
+            for line in joined.splitlines()
+            if line.strip().startswith("mintmark ")
+        )
+    assert examples
+    seen: set[str] = set()
+    for command in examples:
+        if command in seen:
+            continue  # the quickstart mint appears in both blocks
+        seen.add(command)
+        argv = shlex.split(command)[1:]
+        if "--pack" in argv and argv[argv.index("--pack") + 1] != "example":
+            continue  # a sector pack is a separate repository, not present here
+        assert main(argv) == EXIT_OK, command

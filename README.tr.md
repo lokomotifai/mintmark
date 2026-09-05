@@ -13,15 +13,15 @@
 
 <p align="center">
   <a href="https://github.com/lokomotifai/mintmark/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/lokomotifai/mintmark/ci.yml?branch=main&amp;style=flat-square&amp;label=CI"></a>
-  <img alt="983 test" src="https://img.shields.io/badge/test-983-3C873A?style=flat-square">
+  <img alt="986 test" src="https://img.shields.io/badge/test-986-3C873A?style=flat-square">
   <img alt="18 invariant, her biri adlandırılmış testle" src="https://img.shields.io/badge/invariant-18%20test%20edildi-3C873A?style=flat-square">
-  <a href="https://github.com/lokomotifai/mintmark/releases/tag/v0.3.3"><img alt="Sürüm v0.3.3" src="https://img.shields.io/badge/sürüm-v0.3.2-3C873A?style=flat-square"></a>
+  <a href="https://github.com/lokomotifai/mintmark/releases/tag/v0.3.4"><img alt="Sürüm v0.3.4" src="https://img.shields.io/badge/sürüm-v0.3.2-3C873A?style=flat-square"></a>
   <a href="https://pypi.org/project/mintmark/"><img alt="PyPI'de" src="https://img.shields.io/pypi/v/mintmark?style=flat-square&amp;label=PyPI&amp;color=3C873A"></a>
   <a href="LICENSE"><img alt="Apache-2.0 lisansı" src="https://img.shields.io/badge/lisans-Apache--2.0-3B3F46?style=flat-square"></a>
 </p>
 
 <p align="center">
-  <a href="https://www.python.org/"><img alt="Python 3.12" src="https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square"></a>
+  <a href="https://www.python.org/"><img alt="Python 3.12 ile 3.14 arası" src="https://img.shields.io/badge/Python-3.12%20to%203.14-3776AB?style=flat-square"></a>
   <img alt="İki çalışma zamanı bağımlılığı" src="https://img.shields.io/badge/bağımlılık-2-17191F?style=flat-square">
   <img alt="Üretim yolunda model yok" src="https://img.shields.io/badge/model-yok-D11F26?style=flat-square">
   <img alt="Basım anında ağ yok" src="https://img.shields.io/badge/ağ-yok-D11F26?style=flat-square">
@@ -57,7 +57,7 @@ basıldığını söylemek için vurduğu küçük harftir. Bir Mintmark veri k�
 kendisini neyin ürettiğini hâlâ söyleyebilir.
 
 **PyPI'de [`mintmark`](https://pypi.org/project/mintmark/) olarak
-yayımlanmıştır.** 983 test geçiyor, on sekiz invariant'ın hepsinin adlandırılmış
+yayımlanmıştır.** 986 test geçiyor, on sekiz invariant'ın hepsinin adlandırılmış
 testi var ve bayt düzeyindeki determinizm iddiası tek bir platformdan varsayılmak
 yerine tek bir CI koşusunda üç platformda gözlemleniyor.
 
@@ -92,11 +92,12 @@ etrafında olup bitenle ilgilenir:
 ## İki dakikada başlayın
 
 Bağımlılık kurulumundan sonra çevrimdışı. Anahtar yok, hesap yok, ağ yok. Motor
-yalnızca CPython 3.12 üzerinde çalışır; `uv tool install` o yorumlayıcıyı sizin
-için indirir, `pip` ise kurulum yapacağı bir 3.12 ortamına ihtiyaç duyar.
+CPython 3.12, 3.13 ve 3.14 üzerine kurulur; güncel bir macOS ya da Linux'un
+sistem Python'ı `pip` için yeterlidir, `uv tool install` ise ortada yorumlayıcı
+yoksa birini indirir. `mintmark --help` bu komutları yineler.
 
 ```bash
-uv tool install mintmark        # veya, bir Python 3.12 ortamının içinde: pip install mintmark
+uv tool install mintmark        # veya: pip install mintmark
 mintmark mint --pack example --recipe demo --seed 42 --out ./demo-run
 mintmark verify ./demo-run
 ```
@@ -167,6 +168,13 @@ kümesi, `verify`'ın eksikliğini kabul etmediği bir uyarı bloğu taşır.
 Manifestonun `provenance` bloğu, yani oluşturma zaman damgası ve çağrı satırı,
 hariçtir. Manifestodaki diğer her şey dahildir. Windows iddia edilmez ve test
 edilmez.
+
+Motor CPython 3.13 ve 3.14 üzerine de kurulur ve zorunlu CI, golden baytlar
+dahil tüm test paketini aynı üç platformda bu yorumlayıcılarda da çalıştırır.
+Her manifesto iddiayı hâlâ üç platformda CPython 3.12 olarak kaydeder; çünkü
+`verify` o bloğu sabit bir metne bağlar ve genişletmek şimdiye dek üretilmiş
+her veri kümesinin doğrulamasını düşürürdü. Kaydedilen iddia bir sonraki
+manifesto şeması revizyonuyla genişler.
 
 Her terim yük taşır ve iddia dar tutulmuştur, çünkü onu tutmak birinin işidir.
 İddiayı ayakta tutan şeyler:

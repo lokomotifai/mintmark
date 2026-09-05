@@ -11,6 +11,14 @@ line, is excluded. Everything else in the manifest is included.
 
 Windows is not claimed and is not tested.
 
+The engine also installs on CPython 3.13 and 3.14. Required CI runs the whole
+suite, the golden bytes included, on those interpreters on the same three
+platforms, and observes the same bytes. The claim recorded in every manifest
+still names CPython 3.12: `verify` holds the `determinism` block to the engine's
+fixed text, so widening the recorded list would fail every dataset minted so
+far. The recorded claim widens with the next manifest schema revision, which
+is a version event of its own.
+
 ## Why the claim is narrow on purpose
 
 Every term in it is load-bearing.

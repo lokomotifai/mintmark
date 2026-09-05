@@ -102,6 +102,27 @@ def _manifest_schema() -> dict[str, Any]:
     return document
 
 
+START_HERE = """\
+start here:
+  mintmark mint --pack example --recipe demo --seed 42 --out ./demo-run
+  mintmark verify ./demo-run
+  mintmark reproduce ./demo-run
+
+The example pack ships with the engine. Sector packs (banking, insurance, human
+resources) are separate repositories: clone one and pass its directory as
+--pack. No network, keys, or accounts are needed at mint time.
+"""
+
+MINT_EXAMPLES = """\
+examples:
+  mintmark mint --pack example --recipe demo --seed 42 --out ./demo-run
+  mintmark mint --pack ./mintmark-banking --recipe retail-baseline --seed 20260901 --out ./run
+  mintmark mint --pack example --recipe demo --seed 7 --out ./big \\
+      --records customer=1000 --records transaction=2000
+  mintmark mint --pack example --recipe demo --seed 7 --out ./csv-run --format csv
+"""
+
+
 class _Parser(argparse.ArgumentParser):
     """argparse exits 2 on a usage error; this tool's contract says 1.
 
@@ -122,15 +143,55 @@ def build_parser() -> argparse.ArgumentParser:
     parser = _Parser(
         prog="mintmark",
         description="Mint deterministic, fully synthetic, Turkish-first labeled datasets.",
+        epilog=START_HERE,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--version", action="version", version=f"mintmark {__version__}")
-    subparsers = parser.add_subparsers(dest="command", required=True, parser_class=_Parser)
+    subparsers = parser.add_subparsers(
+        dest="command",
+        required=True,
+        parser_class=_Parser,
+        title="verbs",
+        metavar="VERB",
+    )
 
-    mint_parser = subparsers.add_parser("mint", help="mint a dataset")
-    mint_parser.add_argument("--pack", required=True)
-    mint_parser.add_argument("--recipe", required=True)
-    mint_parser.add_argument("--seed", required=True, type=int)
-    mint_parser.add_argument("--out", required=True)
+    mint_parser = subparsers.add_parser(
+        "mint",
+        help="mint a dataset from a pack, a recipe, and a seed",
+        description="Mint a dataset. The same pack, recipe, seed, policy, and format always "
+        "produce the same bytes, and the output carries a manifest that proves it.",
+        epilog=MINT_EXAMPLES,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    mint_parser.add_argument(
+        "--pack",
+        required=True,
+        metavar="PATH|NAME",
+        help="a pack directory (one holding pack.yaml), or `example` for the fixture pack "
+        "that ships with the engine; sector packs are separate repositories to clone",
+    )
+    mint_parser.add_argument(
+        "--recipe",
+        required=True,
+        metavar="NAME",
+        help="a recipe the pack declares; `mintmark inspect PACK` lists them "
+        "(the example pack has `demo`)",
+    )
+    mint_parser.add_argument(
+        "--seed",
+        required=True,
+        type=int,
+        metavar="N",
+        help="an integer from 0 to 2^64-1; the same seed gives the same bytes, "
+        "a different seed a different dataset",
+    )
+    mint_parser.add_argument(
+        "--out",
+        required=True,
+        metavar="DIR",
+        help="directory to create for the dataset; it must not exist yet, "
+        "because a mint never overwrites what may be a published dataset",
+    )
     mint_parser.add_argument(
         "--records",
         action="append",
@@ -142,34 +203,81 @@ def build_parser() -> argparse.ArgumentParser:
         "--identifier-policy",
         choices=["safe", "validator"],
         default="safe",
-        help="safe by default; validator requires an explicit caller opt-in",
+        help="safe (default) emits checksum-invalid identifiers that cannot be real; "
+        "validator emits checksum-valid ones for testing validation logic and must be "
+        "asked for by name",
     )
-    mint_parser.add_argument("--format", choices=["jsonl", "csv"], default="jsonl")
-    mint_parser.add_argument("--json", action="store_true")
+    mint_parser.add_argument(
+        "--format",
+        choices=["jsonl", "csv"],
+        default="jsonl",
+        help="jsonl (default) writes one JSON object per line; csv writes one table per "
+        "record type, with label sidecars still in JSONL",
+    )
+    mint_parser.add_argument(
+        "--json", action="store_true", help="print a stable JSON summary instead of text"
+    )
 
-    for name, help_text in (
-        ("verify", "revalidate a dataset against its manifest"),
-        ("reproduce", "re-mint from a manifest and byte-compare"),
+    for name, help_text, description in (
+        (
+            "verify",
+            "revalidate a dataset against its manifest",
+            "Recompute every claim MINTMARK.json makes: checksums, identifier policy, "
+            "label alignment, coverage, license, and taxonomy pin. Exit 0 means the "
+            "dataset is the one its manifest describes.",
+        ),
+        (
+            "reproduce",
+            "re-mint from a manifest and byte-compare",
+            "Verify, then re-mint from the manifest's recorded inputs and compare bytes. "
+            "The pack is looked for beside the dataset, in the working directory, and, "
+            "for the example pack, inside the engine.",
+        ),
     ):
-        sub = subparsers.add_parser(name, help=help_text)
-        sub.add_argument("directory")
+        sub = subparsers.add_parser(name, help=help_text, description=description)
+        sub.add_argument("directory", help="a dataset directory holding MINTMARK.json")
         sub.add_argument(
             "--trusted-manifest-sha256",
+            metavar="HEX",
             help="require MINTMARK.json to match this externally obtained SHA-256 digest",
         )
-        sub.add_argument("--json", action="store_true")
+        sub.add_argument(
+            "--json", action="store_true", help="print a stable JSON report instead of text"
+        )
 
-    for name, help_text in (
-        ("packcheck", "validate a pack and mini-mint it"),
-        ("inspect", "print a pack's identity and declarations"),
+    for name, help_text, description in (
+        (
+            "packcheck",
+            "validate a pack and mini-mint every recipe",
+            "Load a pack, scan its declarations for real institutions and checksum-valid "
+            "identifiers, mini-mint every recipe, and verify the result.",
+        ),
+        (
+            "inspect",
+            "print a pack's identity, record types, and recipes",
+            "Print what a pack declares: name, version, the core range it requires, its "
+            "digest, record types, and recipe names.",
+        ),
     ):
-        sub = subparsers.add_parser(name, help=help_text)
-        sub.add_argument("pack")
-        sub.add_argument("--json", action="store_true")
+        sub = subparsers.add_parser(name, help=help_text, description=description)
+        sub.add_argument(
+            "pack", metavar="PATH|NAME", help="a pack directory, or `example` for the fixture pack"
+        )
+        sub.add_argument(
+            "--json", action="store_true", help="print a stable JSON payload instead of text"
+        )
 
-    schema_parser = subparsers.add_parser("schema", help="print a shipped JSON Schema")
-    schema_parser.add_argument("which", choices=["pack", "manifest"])
-    schema_parser.add_argument("--json", action="store_true")
+    schema_parser = subparsers.add_parser(
+        "schema",
+        help="print a shipped JSON Schema",
+        description="Print the JSON Schema for a pack declaration or for MINTMARK.json.",
+    )
+    schema_parser.add_argument(
+        "which", choices=["pack", "manifest"], help="which of the two shipped schemas to print"
+    )
+    schema_parser.add_argument(
+        "--json", action="store_true", help="accepted for symmetry; the output is already JSON"
+    )
 
     return parser
 

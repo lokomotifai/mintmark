@@ -11,6 +11,24 @@ output for a fixed set of inputs. A change that alters emitted bytes for a fixed
 seed is a major version event even when no signature changed, because it breaks
 the reproducibility of every published manifest.
 
+## 0.3.4 - 2026-09-05
+
+### Added
+
+- The package installs on CPython 3.13 and 3.14 as well as 3.12, so `pip
+  install mintmark` works with the system Python of a current macOS or Linux.
+  Required CI runs the full suite, golden bytes included, on all three minors on
+  all three platforms, and observes the same bytes. The claim recorded in
+  manifests still names CPython 3.12 on three platforms, because `verify` holds
+  that block to a fixed text; it widens with the next manifest schema revision.
+- `mintmark --help` shows where to start, every option of `mint` explains what
+  it takes and where to find it (`example` for the shipped pack, `mintmark
+  inspect` for recipe names), and each verb carries a description. A test runs
+  every example the help text shows.
+
+Generated record and label files do not change for the same inputs. Manifests
+record the patch engine version.
+
 ## 0.3.3 - 2026-09-05
 
 An end-to-end run against 0.3.2, as a first-time user and as a hostile one,

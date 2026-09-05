@@ -38,7 +38,7 @@ jobs:
         with:
           enable-cache: true
           version: "0.12.3"
-      - run: uv sync --locked
+      - run: uv sync --locked --python 3.12
       - id: check
         name: Compare the tag against pyproject and the package
         run: |
@@ -69,7 +69,7 @@ jobs:
         with:
           enable-cache: true
           version: "0.12.3"
-      - run: uv sync --locked
+      - run: uv sync --locked --python 3.12
       - name: Build with the backend installed from uv.lock
         run: uv build --no-build-isolation
       - name: Confirm the built artifacts carry the tagged version
