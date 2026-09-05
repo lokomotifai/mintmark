@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mintmark"
-version = "0.3.2"
+version = "0.3.3"
 description = "Deterministic, fully synthetic, Turkish-first labeled datasets with a provenance manifest."
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
@@ -25,6 +25,12 @@ dependencies = [
   "PyYAML>=6.0,<7",
 ]
 
+[project.urls]
+Homepage = "https://github.com/lokomotifai/mintmark"
+Repository = "https://github.com/lokomotifai/mintmark"
+Changelog = "https://github.com/lokomotifai/mintmark/blob/main/CHANGELOG.md"
+Issues = "https://github.com/lokomotifai/mintmark/issues"
+
 [project.scripts]
 mintmark = "mintmark.cli:main"
 
@@ -42,7 +48,10 @@ dev = [
 ]
 
 [tool.uv]
-required-version = "==0.12.3"
+# Required CI installs exactly 0.12.3. A contributor's uv only has to be in the
+# same minor series: an exact pin here refused every other 0.12 release and
+# blocked the uv updates Dependabot proposes.
+required-version = ">=0.12.3,<0.13"
 
 # Package data ships with both the sdist and the wheel. tools/ and tests/ do not.
 [tool.hatch.build.targets.wheel]

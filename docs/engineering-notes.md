@@ -79,6 +79,34 @@ in this repository is proven twice: once by passing on clean input, and once by
 failing on deliberately broken input and then passing again after the breakage
 is removed. A lint that has never been observed failing is not known to work.
 
+## Output conventions worth knowing before they surprise you
+
+A mint writes into a staging directory created with `mkdtemp`, so the finished
+dataset directory is mode 0700 and its files are mode 0600: readable by the
+owner alone. Sharing a dataset through a shared directory means loosening those
+modes deliberately; the engine does not consult the umask.
+
+Two byte budgets bound a mint independently of the record-count ceiling. Each
+output file may not exceed 256 MiB and a dataset may not exceed 512 MiB in
+total. The million-record ceiling on a single type is therefore reachable only
+for compact record types; the example pack's customer records run into the
+aggregate budget first, and the mint is refused with `dataset-output-byte-limit`
+after the staging directory is discarded.
+
+CSV emission refuses any cell whose first meaningful character would make a
+spreadsheet evaluate it, with one deliberate exemption: a Turkish mobile number
+in the emitted `+90 5xx xxx xx xx` shape, and signed numerals, are passed
+through. A phone number is the value a consumer expects in that column, and it
+is not an active payload. The exemption is fixed in `emit/csv_writer.py` and
+covers nothing else.
+
+SIGINT and SIGTERM both leave nothing behind. A keyboard interrupt unwinds
+through `staged_output`, which discards the staging directory; SIGTERM is turned
+into the same unwinding by a handler installed for the duration of the mint,
+and only when the process has not installed one of its own. SIGKILL cannot be
+intercepted, so a `.<name>.staging-*` directory next to the target is the trace
+of a mint that was killed rather than stopped. It is safe to delete.
+
 ## Invariant to test map
 
 Every invariant in the plan, the file that proves it, and the command that

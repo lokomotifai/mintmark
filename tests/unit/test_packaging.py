@@ -118,7 +118,7 @@ def test_the_packaged_example_resolves_by_name() -> None:
     `--pack packs/example` is a path that only exists in a checkout, so anyone
     who installed from an index followed the README straight into an error.
     """
-    from mintmark.mint import packaged_pack_dir, resolve_pack
+    from mintmark.minting import packaged_pack_dir, resolve_pack
 
     resolved = resolve_pack("example")
     assert resolved == packaged_pack_dir("example")
@@ -127,7 +127,7 @@ def test_the_packaged_example_resolves_by_name() -> None:
 
 def test_a_local_path_always_wins_over_the_packaged_name(tmp_path: Path, monkeypatch) -> None:
     """Otherwise a directory called `example` would be silently ignored."""
-    from mintmark.mint import resolve_pack
+    from mintmark.minting import resolve_pack
 
     local = tmp_path / "example"
     local.mkdir()
@@ -141,7 +141,7 @@ def test_an_unknown_name_is_returned_unchanged(tmp_path: Path, monkeypatch) -> N
     Returning the argument untouched lets the loader fail with the path the user
     actually typed, which is the error they can act on.
     """
-    from mintmark.mint import resolve_pack
+    from mintmark.minting import resolve_pack
 
     monkeypatch.chdir(tmp_path)
     assert resolve_pack("exampel") == Path("exampel")
@@ -159,3 +159,32 @@ def test_the_quickstart_command_runs_against_the_packaged_pack(tmp_path: Path) -
     )
     assert (out / "MINTMARK.json").exists()
     assert main(["verify", str(out)]) == 0
+
+
+def test_the_project_publishes_its_urls() -> None:
+    """PyPI links back to the repository, the changelog, and the issue tracker."""
+    import tomllib
+
+    with (REPO_ROOT / "pyproject.toml").open("rb") as handle:
+        urls = tomllib.load(handle)["project"]["urls"]
+    assert set(urls) >= {"Homepage", "Repository", "Changelog", "Issues"}
+    assert all(
+        value.startswith("https://github.com/lokomotifai/mintmark") for value in urls.values()
+    )
+
+
+def test_the_sbom_names_its_root_component_and_omits_the_dev_toolchain() -> None:
+    """The bill of materials describes the published package, not the developer's venv."""
+    import json
+
+    path = DIST / "sbom.json"
+    if not path.exists():
+        pytest.skip("no sbom.json in dist/; generate it at release time")
+    document = json.loads(path.read_text(encoding="utf-8"))
+    root = document["metadata"]["component"]
+    from mintmark import __version__
+
+    assert root["name"] == "mintmark"
+    assert root["version"] == __version__
+    names = {component["name"].lower() for component in document["components"]}
+    assert not ({"pytest", "mypy", "ruff", "hypothesis"} & names), names

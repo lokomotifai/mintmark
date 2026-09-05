@@ -242,3 +242,50 @@ def test_staged_output_does_not_follow_a_preplanted_leaf_symlink(tmp_path: Path)
         (staged.path / "data.jsonl").unlink()
         staged.open("safe.jsonl").close()
     assert outside.read_text(encoding="utf-8") == "keep\n"
+
+
+def test_a_sigterm_during_a_mint_also_cleans_up(tmp_path: Path) -> None:
+    """SIGTERM's default disposition ends the process before any cleanup runs.
+
+    For the duration of a mint it is turned into an exception, so the staging
+    directory is discarded and the process still exits the way a terminated
+    process does.
+    """
+    import os
+    import signal
+
+    if signal.getsignal(signal.SIGTERM) is not signal.SIG_DFL:
+        pytest.skip("the host installed its own SIGTERM handler; the mint must leave it alone")
+    target = tmp_path / "run"
+
+    def terminated() -> None:
+        with staged_output(target) as staged:
+            staged.open("x.jsonl").close()
+            os.kill(os.getpid(), signal.SIGTERM)
+            for _ in range(10_000):  # give the handler a bytecode boundary to run at
+                pass
+            raise AssertionError("SIGTERM was not turned into an exception")
+
+    with pytest.raises(SystemExit) as caught:
+        terminated()
+    assert caught.value.code == 128 + signal.SIGTERM
+    assert not target.exists()
+    assert list(tmp_path.iterdir()) == []
+    assert signal.getsignal(signal.SIGTERM) is signal.SIG_DFL, (
+        "the previous handler was not restored"
+    )
+
+
+def test_a_host_sigterm_handler_is_left_alone(tmp_path: Path) -> None:
+    import signal
+
+    def host_handler(signum: int, frame: object) -> None:  # pragma: no cover - never invoked
+        del signum, frame
+
+    previous = signal.signal(signal.SIGTERM, host_handler)
+    try:
+        with staged_output(tmp_path / "run") as staged:
+            staged.open("x.jsonl").close()
+            assert signal.getsignal(signal.SIGTERM) is host_handler
+    finally:
+        signal.signal(signal.SIGTERM, previous)

@@ -82,3 +82,14 @@ def is_checksum_valid(value: str) -> bool:
     """Email addresses carry no checksum. See the note in the phone engine."""
     del value
     return False
+
+
+def is_well_formed(value: str) -> bool:
+    """Return True when `value` is one address under a reserved documentation name.
+
+    Every emitted address sits under `.example` or the `example.com` family, so
+    a span labeled EMAIL that reads anything else is not the value this engine
+    placed there.
+    """
+    local, at, _ = value.partition("@")
+    return bool(at) and bool(local) and " " not in value and is_reserved(value)

@@ -28,7 +28,7 @@ from mintmark.engine.templates import (
     TemplateError,
     parse_template,
 )
-from mintmark.mint import MintError, mint
+from mintmark.minting import MintError, mint
 from mintmark.packs.model import PackError, load_pack
 
 LABELS = frozenset({"PERSON", "ORG", "HEALTH", "UNION", "IBAN", "TCKN"})

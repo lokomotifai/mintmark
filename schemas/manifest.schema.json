@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://lokomotifai.dev/mintmark/schemas/manifest.schema.json",
-  "title": "MINTMARK.json, manifest schema version 1",
+  "title": "MINTMARK.json, manifest schema version 2",
   "description": "The provenance record that makes a directory of files a Mintmark dataset. A dataset without its manifest is not a Mintmark deliverable.",
   "type": "object",
   "additionalProperties": false,

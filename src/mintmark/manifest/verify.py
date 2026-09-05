@@ -113,10 +113,23 @@ class VerifyReport:
             "problems": list(self.problems),
         }
 
+    @property
+    def _reached_the_files(self) -> bool:
+        """False when verification stopped before opening a single output.
+
+        A missing directory, a manifest that fails its schema, or a trusted
+        digest that does not match all end the run early. The lines below then
+        describe checks that never happened, and must say so rather than
+        report a zero that reads like a result.
+        """
+        return self.checksums_checked > 0
+
     def render(self) -> str:
         lines = [
             f"manifest schema: {'valid' if self.schema_valid else 'INVALID'}",
-            f"checksums: {self.checksums_matched}/{self.checksums_checked} match",
+            f"checksums: {self.checksums_matched}/{self.checksums_checked} match"
+            if self._reached_the_files
+            else "checksums: not checked",
             f"identifier policy: {self.identifier_policy} (confirmed)"
             if self.identifier_policy != "unknown"
             else "identifier policy: unknown",
@@ -128,11 +141,17 @@ class VerifyReport:
             ),
             f"coverage targets: {self.coverage_targets_checked} checked"
             if self.coverage_checked
-            else "coverage targets: not checked, this mint overrode its record counts",
-            f"taxonomy: {self.taxonomy_pin}",
-            f"label alignment: {self.documents_checked} documents, {self.spans_checked} spans",
+            else (
+                "coverage targets: not checked, this mint overrode its record counts"
+                if self._reached_the_files
+                else "coverage targets: not checked"
+            ),
+            f"taxonomy: {self.taxonomy_pin or 'unknown'}",
+            f"label alignment: {self.documents_checked} documents, {self.spans_checked} spans"
+            if self._reached_the_files
+            else "label alignment: not checked",
             f"dataset license: {self.dataset_license}",
-            f"attribution: {self.attribution}",
+            f"attribution: {self.attribution or 'unknown'}",
             f"authenticity: {self.authenticity}",
         ]
         lines.extend(f"PROBLEM: {problem}" for problem in self.problems)
@@ -144,11 +163,18 @@ def verify(
     *,
     schema: dict[str, Any],
     validators: dict[str, Validator],
+    shapes: Mapping[str, Validator] | None = None,
     expected_taxonomy_pin: str | None = None,
     known_labels: frozenset[str] = frozenset(),
     trusted_manifest_sha256: str | None = None,
 ) -> VerifyReport:
-    """Recompute every claim the manifest makes."""
+    """Recompute every claim the manifest makes.
+
+    `validators` are the checksum functions a safe-mode sweep applies to every
+    string value. `shapes` are per-label surface checks: a span labeled IBAN
+    must read like an IBAN. Without them a sidecar whose offsets were shifted,
+    with every digest rewritten to match, would still verify.
+    """
     directory = Path(directory)
     report = VerifyReport(directory=str(directory))
 
@@ -236,6 +262,7 @@ def verify(
                 report,
                 document_texts=primary.document_texts,
                 known_labels=known_labels,
+                shapes=shapes or {},
             )
             _check_manifest_claims(document, primary, label_counts, report, known_labels)
             _check_coverage(document, report)
@@ -687,8 +714,16 @@ def _check_spans(
     *,
     document_texts: dict[str, dict[str, str]],
     known_labels: frozenset[str],
+    shapes: Mapping[str, Validator],
 ) -> Counter[str]:
-    """Re-extract every span from the text it indexes."""
+    """Re-extract every span from the text it indexes.
+
+    Structure first: bounds, whitespace, duplicates, overlaps, and a known label.
+    Then the surface: a span carrying an identifier label has to read like that
+    identifier, and a surface that reads like an identifier has to carry that
+    label. Entity labels drawn from lexicons carry no fixed shape of their own
+    and are counted rather than shape-checked.
+    """
     import hashlib
 
     names = {output["path"] for output in document["outputs"]}
@@ -777,10 +812,32 @@ def _check_spans(
                         f"falls outside a {len(text)} character document"
                     )
                     continue
-                if not text[span["start"] : span["end"]].strip():
+                surface = text[span["start"] : span["end"]]
+                if not surface.strip():
                     report.problems.append(
                         f"{sidecar_name} line {number}: span [{span['start']}, "
                         f"{span['end']}) covers only whitespace"
+                    )
+                    continue
+                shape = shapes.get(label)
+                if shape is not None and not shape(surface):
+                    report.problems.append(
+                        f"{sidecar_name} line {number}: span [{span['start']}, "
+                        f"{span['end']}) reads {surface!r}, which does not match the "
+                        f"{label} shape"
+                    )
+                    continue
+                # The converse: a surface shaped like an identifier must carry that
+                # identifier's label. Lexicon-drawn entities never take these
+                # shapes, so a match here is a relabeled span, not a coincidence.
+                impostor = next(
+                    (name for name, check in shapes.items() if name != label and check(surface)),
+                    None,
+                )
+                if impostor is not None:
+                    report.problems.append(
+                        f"{sidecar_name} line {number}: span [{span['start']}, "
+                        f"{span['end']}) has the shape of {impostor} but is labeled {label}"
                     )
                     continue
                 intervals.append((span["start"], span["end"]))

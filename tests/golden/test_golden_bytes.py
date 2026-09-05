@@ -19,7 +19,7 @@ from pathlib import Path
 import pytest
 
 from mintmark.cli import EXIT_OK, main
-from mintmark.mint import mint
+from mintmark.minting import mint
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PACK = REPO_ROOT / "packs" / "example"

@@ -72,15 +72,11 @@ jobs:
       - run: uv sync --locked
       - name: Build with the backend installed from uv.lock
         run: uv build --no-build-isolation
-      - name: Generate the bill of materials
-        run: uv run cyclonedx-py environment --of JSON -o dist/sbom.json
       - name: Confirm the built artifacts carry the tagged version
         run: |
           set -euo pipefail
           test -f "dist/mintmark-${{ needs.verify.outputs.version }}-py3-none-any.whl"
           test -f "dist/mintmark-${{ needs.verify.outputs.version }}.tar.gz"
-      - name: Inspect the exact distributions that will be published
-        run: uv run pytest tests/unit/test_packaging.py
       - name: Smoke-test the wheel in an isolated directory
         run: |
           set -euo pipefail
@@ -93,6 +89,19 @@ jobs:
           cd "$smoke"
           "$smoke/venv/bin/mintmark" mint --pack example --recipe demo --seed 42 --out run
           "$smoke/venv/bin/mintmark" verify run
+          echo "SMOKE_PYTHON=$smoke/venv/bin/python" >> "$GITHUB_ENV"
+      - name: Generate the bill of materials from the installed wheel
+        # The smoke environment holds the published wheel and its two runtime
+        # dependencies and nothing else, so the bill describes what a user
+        # installs rather than the developer toolchain that built it. The root
+        # component is read from pyproject so the document names what it is.
+        run: |
+          set -euo pipefail
+          uv run cyclonedx-py environment "$SMOKE_PYTHON" \
+            --pyproject pyproject.toml --mc-type library \
+            --of JSON -o dist/sbom.json
+      - name: Inspect the exact distributions that will be published
+        run: uv run pytest tests/unit/test_packaging.py
       - name: Scan built artifacts for private-corpus canary
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         env:

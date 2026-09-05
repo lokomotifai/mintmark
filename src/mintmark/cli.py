@@ -1,8 +1,9 @@
 """The command line surface, on argparse and the standard library only.
 
-Seven verbs, five exit codes, and a stable `--json` payload for each verb that
-declares one. Those are a public contract under semantic versioning: adding a
-field is a minor version, removing or retyping one is a major.
+Seven verbs, five exit codes, one interruption code, and a stable `--json`
+payload for each verb that declares one. Those are a public contract under
+semantic versioning: adding a field is a minor version, removing or retyping one
+is a major.
 
 Exit codes carry meaning, because a script consuming this tool needs to tell a
 malformed pack from a tampered dataset from a reproduction mismatch:
@@ -12,6 +13,9 @@ malformed pack from a tampered dataset from a reproduction mismatch:
     2  invalid pack, failing closed
     3  verification failure
     4  reproduction mismatch
+
+An interrupted run returns 130, the conventional code for a process stopped by
+SIGINT, after the staging directory has been discarded.
 
 Error messages name the file, the location, and the rule. No stack trace reaches
 a user at default verbosity: a traceback tells them about this program's
@@ -28,7 +32,7 @@ import sys
 import tempfile
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, Never
 
 from mintmark.annotate import Label, pin_digest
 from mintmark.engine.templates import (
@@ -39,6 +43,7 @@ from mintmark.engine.templates import (
     LexiconSlot,
     Literal,
     Optional,
+    TemplateError,
     parse_template,
 )
 from mintmark.identifiers import ALL_ENGINES, CHECKSUMMED
@@ -58,7 +63,7 @@ from mintmark.manifest.io import (
     DatasetReader,
 )
 from mintmark.manifest.safety import identifier_candidates, scalar_texts
-from mintmark.mint import MintError, asset_dir, mint, packaged_pack_dir, resolve_pack, schema_dir
+from mintmark.minting import MintError, asset_dir, mint, packaged_pack_dir, resolve_pack, schema_dir
 from mintmark.packs.loader import PackError
 from mintmark.packs.model import load_pack
 
@@ -67,6 +72,8 @@ EXIT_USAGE = 1
 EXIT_INVALID_PACK = 2
 EXIT_VERIFY_FAILED = 3
 EXIT_REPRODUCE_MISMATCH = 4
+# 128 + SIGINT, the code a shell reports for a process the user stopped.
+EXIT_INTERRUPTED = 130
 
 
 def _validators() -> dict[str, Any]:
@@ -78,6 +85,16 @@ def _validators() -> dict[str, Any]:
     return {name: engine.is_checksum_valid for name, engine in CHECKSUMMED.items()}
 
 
+def _shapes() -> dict[str, Any]:
+    """Compose the per-label surface checks span verification applies.
+
+    A span labeled IBAN must read like an IBAN. Checksums prove the file is the
+    one the manifest sealed; this proves the offsets still point at the value
+    the label names, which a consistent rewrite of every digest would not.
+    """
+    return {name: engine.is_well_formed for name, engine in ALL_ENGINES.items()}
+
+
 def _manifest_schema() -> dict[str, Any]:
     document: dict[str, Any] = json.loads(
         (schema_dir() / "manifest.schema.json").read_text(encoding="utf-8")
@@ -85,15 +102,29 @@ def _manifest_schema() -> dict[str, Any]:
     return document
 
 
+class _Parser(argparse.ArgumentParser):
+    """argparse exits 2 on a usage error; this tool's contract says 1.
+
+    Two is what the contract reserves for a malformed pack, so a script that
+    branches on the code must be able to trust the table in this module's
+    docstring rather than argparse's own convention.
+    """
+
+    def error(self, message: str) -> Never:
+        self.print_usage(sys.stderr)
+        print(f"{self.prog}: error: {message}", file=sys.stderr)
+        raise SystemExit(EXIT_USAGE)
+
+
 def build_parser() -> argparse.ArgumentParser:
     from mintmark import __version__
 
-    parser = argparse.ArgumentParser(
+    parser = _Parser(
         prog="mintmark",
         description="Mint deterministic, fully synthetic, Turkish-first labeled datasets.",
     )
     parser.add_argument("--version", action="version", version=f"mintmark {__version__}")
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    subparsers = parser.add_subparsers(dest="command", required=True, parser_class=_Parser)
 
     mint_parser = subparsers.add_parser("mint", help="mint a dataset")
     mint_parser.add_argument("--pack", required=True)
@@ -161,20 +192,40 @@ def main(argv: Sequence[str] | None = None) -> int:
                 return _cmd_inspect(args)
             case "schema":
                 return _cmd_schema(args)
-    except PackError as error:
-        print(f"mintmark: {error}", file=sys.stderr)
-        return EXIT_INVALID_PACK
+    except (PackError, TemplateError) as error:
+        # A malformed template is a malformed pack: it is a file the pack ships.
+        return _fail(args, error, EXIT_INVALID_PACK)
     except MintError as error:
-        print(f"mintmark: {error}", file=sys.stderr)
-        return EXIT_USAGE
+        return _fail(args, error, EXIT_USAGE)
     except (KeyError, ValueError) as error:
-        print(f"mintmark: {error}", file=sys.stderr)
-        return EXIT_USAGE
+        return _fail(args, error, EXIT_USAGE)
     except FileNotFoundError as error:
-        print(f"mintmark: {error}", file=sys.stderr)
-        return EXIT_VERIFY_FAILED
+        return _fail(args, error, EXIT_VERIFY_FAILED)
+    except OSError as error:
+        # An output directory that already exists, a parent that refuses writes,
+        # a path that is a file: the invocation cannot be satisfied as given.
+        return _fail(args, error, EXIT_USAGE)
+    except KeyboardInterrupt:
+        # The staging directory is already gone: staged_output discards it on
+        # the way out. All that is left is to say so without a traceback.
+        print("mintmark: interrupted", file=sys.stderr)
+        return EXIT_INTERRUPTED
 
     return EXIT_USAGE
+
+
+def _fail(args: argparse.Namespace, error: BaseException, code: int) -> int:
+    """Report a failure the way the verb was asked to report: text, or JSON.
+
+    A caller that passed --json is parsing stdout. Leaving it empty on the error
+    path forces them to fall back to scraping stderr, which is the thing --json
+    exists to make unnecessary.
+    """
+    message = str(error)
+    print(f"mintmark: {message}", file=sys.stderr)
+    if getattr(args, "json", False):
+        print(json.dumps({"ok": False, "problems": [message]}, ensure_ascii=False, indent=2))
+    return code
 
 
 def _mint_invocation(args: argparse.Namespace) -> str:
@@ -237,6 +288,7 @@ def _cmd_verify(args: argparse.Namespace) -> int:
         Path(args.directory),
         schema=_manifest_schema(),
         validators=_validators(),
+        shapes=_shapes(),
         expected_taxonomy_pin=pin_digest(),
         known_labels=frozenset(label.value for label in Label),
         trusted_manifest_sha256=args.trusted_manifest_sha256,
@@ -254,6 +306,7 @@ def _cmd_reproduce(args: argparse.Namespace) -> int:
         directory,
         schema=_manifest_schema(),
         validators=_validators(),
+        shapes=_shapes(),
         expected_taxonomy_pin=pin_digest(),
         known_labels=frozenset(label.value for label in Label),
         trusted_manifest_sha256=args.trusted_manifest_sha256,
@@ -300,9 +353,12 @@ def _cmd_reproduce(args: argparse.Namespace) -> int:
         pack_hint = document["pack"]["name"]
         pack_root = _locate_pack(directory, pack_hint)
         if pack_root is None:
+            searched = ", ".join(str(path) for path in _pack_candidates(directory, pack_hint))
             message = (
-                f"cannot locate pack {pack_hint!r} to re-mint from. Pass a checkout of "
-                "the pack at the version the manifest records."
+                f"cannot locate pack {pack_hint!r} to re-mint from. A dataset does not "
+                f"carry its pack, so place a checkout of {pack_hint!r} at the version "
+                f"the manifest records in one of the places searched, or run from inside "
+                f"that checkout. Searched: {searched}"
             )
             if args.json:
                 print(json.dumps({"ok": False, "problems": [message]}, indent=2))
@@ -416,14 +472,9 @@ def _format_of(document: dict[str, Any]) -> str:
     return "jsonl"
 
 
-def _locate_pack(directory: Path, name: str) -> Path | None:
-    """Find the pack a manifest names, in the usual places.
-
-    A dataset does not carry its pack, so reproduction needs one. Looking beside
-    the dataset and in the working directory covers the two cases that matter:
-    a developer re-minting their own run, and a consumer who cloned the pack.
-    """
-    candidates = [
+def _pack_candidates(directory: Path, name: str) -> list[Path]:
+    """The places a pack is looked for, in order, so an error can name them."""
+    return [
         directory / "pack",
         directory.parent / name,
         Path.cwd() / name,
@@ -435,7 +486,16 @@ def _locate_pack(directory: Path, name: str) -> Path | None:
         # the check that makes a manifest mean something.
         packaged_pack_dir(name.removeprefix("mintmark-")),
     ]
-    for candidate in candidates:
+
+
+def _locate_pack(directory: Path, name: str) -> Path | None:
+    """Find the pack a manifest names, in the usual places.
+
+    A dataset does not carry its pack, so reproduction needs one. Looking beside
+    the dataset and in the working directory covers the two cases that matter:
+    a developer re-minting their own run, and a consumer who cloned the pack.
+    """
+    for candidate in _pack_candidates(directory, name):
         if (candidate / "pack.yaml").exists():
             try:
                 if load_pack(candidate).name == name:
@@ -495,13 +555,17 @@ def _pack_safety(pack_root: Path, loaded: Any) -> tuple[Any, list[str]]:
             surfaces.extend((source, text) for text in scalar_texts(field.params))
     for set_name, entries in loaded.template_sets.items():
         for entry in entries:
-            nodes = parse_template(
-                entry.text,
-                template_id=entry.id,
-                known_labels=frozenset(label.value for label in Label),
-                known_identifiers=frozenset(ALL_ENGINES),
-                known_lexicons=frozenset(loaded.lexicons),
-            )
+            try:
+                nodes = parse_template(
+                    entry.text,
+                    template_id=entry.id,
+                    known_labels=frozenset(label.value for label in Label),
+                    known_identifiers=frozenset(ALL_ENGINES),
+                    known_lexicons=frozenset(loaded.lexicons),
+                )
+            except TemplateError as exc:
+                problems.append(f"template {set_name}/{entry.id}: {exc.rule}: {exc.detail}")
+                continue
             try:
                 renderings = _literal_expansions(nodes)
             except ValueError as exc:
@@ -572,6 +636,7 @@ def _cmd_packcheck(args: argparse.Namespace) -> int:
                 out,
                 schema=_manifest_schema(),
                 validators=_validators(),
+                shapes=_shapes(),
                 expected_taxonomy_pin=pin_digest(),
                 known_labels=frozenset(label.value for label in Label),
             )

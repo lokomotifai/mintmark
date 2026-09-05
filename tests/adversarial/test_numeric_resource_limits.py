@@ -11,7 +11,7 @@ import pytest
 import yaml
 
 from mintmark.engine.draws import TWO64
-from mintmark.mint import MintError, mint
+from mintmark.minting import MintError, mint
 from mintmark.packs.model import MAX_RECORDS_PER_TYPE, PackError, load_pack
 
 CONFORMANCE = Path(__file__).resolve().parents[1] / "conformance" / "pack"
@@ -134,7 +134,7 @@ def test_runtime_record_override_uses_the_same_budget(tmp_path: Path) -> None:
 def test_generated_output_bytes_are_bounded_before_publication(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import mintmark.mint as mint_module
+    import mintmark.minting as mint_module
 
     monkeypatch.setattr(mint_module, "MAX_DATA_FILE_BYTES", 512)
     out = tmp_path / "out"

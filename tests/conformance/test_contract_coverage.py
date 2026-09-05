@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from mintmark.mint import mint
+from mintmark.minting import mint
 from mintmark.packs.model import load_pack
 
 REPO_ROOT = Path(__file__).resolve().parents[2]

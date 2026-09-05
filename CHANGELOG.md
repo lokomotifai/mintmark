@@ -11,6 +11,81 @@ output for a fixed set of inputs. A change that alters emitted bytes for a fixed
 seed is a major version event even when no signature changed, because it breaks
 the reproducibility of every published manifest.
 
+## 0.3.3 - 2026-09-05
+
+An end-to-end run against 0.3.2, as a first-time user and as a hostile one,
+found the defects below. Generated record and label files do not change for the
+same inputs; manifests record the patch engine version.
+
+### Fixed
+
+- `from mintmark import mint` returned a module, and calling it raised
+  `TypeError`. The composition root was a submodule named `mint`, and the import
+  system binds a package attribute to a submodule of the same name the moment it
+  loads, so the documented function was reachable only until the CLI or anything
+  else imported the module. The composition root is now `mintmark.minting`, the
+  package binds the function once on first access, and a test exercises the
+  public path under every import order. No test had used it before.
+- `verify` re-sliced every span but never asked whether the slice was the value
+  its label named. A sidecar with one offset shifted, or an IBAN span relabeled
+  PERSON, verified clean once every digest was rewritten to match. Every span
+  carrying an identifier label must now have that identifier's shape, and a
+  surface with an identifier's shape must carry that label. Across 525,702 spans
+  from every published pack recipe, the check raised nothing.
+- An output directory that already exists, an output path that is a file, a
+  parent directory that refuses writes, and a keyboard interrupt all reached the
+  user as tracebacks. Each is now one line on stderr with the exit code the
+  contract assigns; an interrupted run returns 130.
+- argparse reported usage errors with exit code 2, which the contract reserves
+  for a malformed pack. They exit 1. A malformed template, which is a file the
+  pack ships, exits 2 from `mint` and is reported as a problem by `packcheck`
+  instead of ending it.
+- `packcheck --json`, `inspect --json`, and `mint --json` wrote nothing to stdout
+  when the pack or the invocation was refused. They now emit `{"ok": false,
+  "problems": [...]}` alongside the stderr line, as `verify` and `reproduce`
+  already did.
+- A schema violation over a large instance echoed the whole instance into a
+  single stderr line; five thousand fields produced 605 kilobytes. The echo is
+  bounded and the violated rule is named first.
+- SIGTERM ended a mint before its cleanup ran and left a `.<name>.staging-*`
+  directory beside the target. For the duration of a mint SIGTERM is turned
+  into an exception, unless the host process installed a handler of its own, so
+  the staging directory is discarded and the process exits with 143.
+- A `verify` run that stopped before opening any file printed `checksums: 0/0
+  match` and `coverage targets: not checked, this mint overrode its record
+  counts`, neither of which was true. Those lines now read `not checked`.
+- `reproduce` told a user who lacked the pack to pass a checkout, without a way
+  to do so. The message names every location searched and how to satisfy one.
+- The manifest schema's title said version 1 while every manifest carried
+  `manifest_schema_version: 2`.
+- The published bill of materials had no root component and listed the
+  developer toolchain. It is now generated from the smoke-test environment,
+  which holds the published wheel and its two runtime dependencies, with
+  `mintmark` as the root.
+
+### Changed
+
+- `pyproject.toml` accepts any uv in the 0.12 series instead of exactly 0.12.3.
+  The exact pin refused every other 0.12 release, including the one Dependabot
+  runs, so its update job failed on every attempt. Required CI still installs
+  0.12.3.
+- `python -m mintmark` reaches the console script's entry point.
+- The package metadata carries the repository, changelog, and issue tracker
+  URLs, so the PyPI page links back here.
+
+### Documented
+
+- The quickstart states that the engine runs on CPython 3.12 only and that
+  `pip install` needs a 3.12 environment; `uv tool install` fetches one.
+- README's claim about span verification now describes what `verify` does.
+- Output directories are created mode 0700 and files 0600; the per-file and
+  aggregate byte budgets; the deliberate CSV exemption for `+90` phone cells;
+  and what a leftover staging directory means. See
+  `docs/engineering-notes.md`.
+- Where `reproduce` looks for a pack. See `docs/determinism.md`.
+- While the major version is zero, a byte-moving change is carried by the
+  minor version, as 0.3.0 did; a patch release never moves bytes.
+
 ## 0.3.2 - 2026-08-23
 
 ### Security

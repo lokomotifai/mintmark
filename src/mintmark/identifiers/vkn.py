@@ -57,3 +57,8 @@ def is_checksum_valid(value: str) -> bool:
     if len(value) != LENGTH or not value.isdigit():
         return False
     return int(value[9]) == _check_digit(value[:9])
+
+
+def is_well_formed(value: str) -> bool:
+    """Return True when `value` has the shape of a VKN: exactly ten digits."""
+    return len(value) == LENGTH and value.isdigit()

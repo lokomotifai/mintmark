@@ -82,6 +82,14 @@ in the range the pack pins.
 these exact bytes. A dataset whose checksums were updated after an edit passes
 the first and fails the second.
 
+A dataset does not carry its pack, so `reproduce` looks for it in a fixed set of
+places: a `pack` directory inside the dataset, a directory named after the pack
+beside the dataset or in the working directory, `packs/<name>` under the working
+directory, the working directory itself, and, for the example pack, the copy the
+engine ships. Running `reproduce` from inside a checkout of the pack is the
+simplest way to satisfy it. When none of those holds a matching pack the error
+names every place it looked.
+
 ## How the claim is checked
 
 `tests/golden/demo-run/` holds the committed output of
